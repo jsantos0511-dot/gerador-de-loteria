@@ -8,43 +8,43 @@ import math
 # 1. Configuração da Página
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# 2. CSS Ultra-Compacto para evitar quebra de linha
+# 2. CSS Corrigido para Colunas Estreitas (6 por linha)
 st.markdown("""
     <style>
-    /* Reset total de margens do Streamlit para Mobile */
+    /* Ajuste do container principal */
     .block-container {
         padding: 1rem 0.5rem !important;
     }
     
-    /* Força 6 colunas com largura exata e sem margens laterais */
+    /* FORÇAR GRADE DE 6 COLUNAS REAIS */
     div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 2px !important; /* Espaço mínimo entre botões */
-        margin-bottom: -10px !important; /* Aproxima as linhas verticalmente */
+        display: grid !important;
+        grid-template-columns: repeat(6, 1fr) !important; /* Divide em 6 fatias iguais */
+        gap: 4px !important;
+        width: 100% !important;
     }
 
-    /* Ajuste de cada coluna individualmente */
+    /* Impede que as colunas internas do Streamlit estiquem sozinhas */
     div[data-testid="column"] {
-        flex: 1 1 0% !important;
+        width: 100% !important;
         min-width: 0 !important;
+        flex: 1 !important;
     }
 
-    /* Estilo do Botão: Compacto para caber em telas pequenas */
+    /* Estilo do Botão: Compacto e Centralizado */
     button {
-        height: 38px !important;
+        height: 40px !important;
+        width: 100% !important;
         padding: 0px !important;
-        font-size: 13px !important;
+        font-size: 14px !important;
         font-weight: bold !important;
         border-radius: 4px !important;
-        margin: 0px !important;
     }
 
-    /* Impede que o texto "Selecionados" ou outros elementos quebrem a grade */
+    /* Reset para a área de configurações (não queremos 6 colunas aqui) */
     .config-box div[data-testid="stHorizontalBlock"] {
         display: flex !important;
-        flex-wrap: wrap !important;
+        grid-template-columns: none !important;
         gap: 10px !important;
     }
     </style>
@@ -57,17 +57,19 @@ if 'limpar_count' not in st.session_state:
 
 st.title("🎰 Gerador Pro")
 
-# --- VOLANTE COMPACTO ---
+# --- VOLANTE COMPACTO 6 COLUNAS ---
 st.subheader("Selecione as Dezenas")
 qtd = len(st.session_state.selecionados)
 st.write(f"**Selecionados:** {qtd}/60")
 
-# Gerando o volante com 6 colunas (10 linhas)
+# Loop para criar as linhas do volante
 for linha in range(10): 
     cols = st.columns(6)
     for coluna in range(6):
         numero = linha * 6 + coluna + 1
         is_sel = numero in st.session_state.selecionados
+        
+        # Botão renderizado dentro da grade de 6
         if cols[coluna].button(
             f"{numero:02d}", 
             key=f"v_{numero}_{st.session_state.limpar_count}", 
@@ -127,17 +129,16 @@ if gerar:
                 res.append(j)
                 if len(res) >= qtd_max: break
 
-            m1, m2 = st.columns(2)
-            m1.metric("Jogos", f"{len(res):,}".replace(",", "."))
-            m2.metric("Total", f"R$ {len(res)*valor_unit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("Jogos", f"{len(res):,}".replace(",", "."))
+            st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
             st.dataframe(res[:500], use_container_width=True)
             
             csv_io = io.StringIO()
             csv_io.write('\ufeff')
             w = csv.writer(csv_io, delimiter=';')
-            w.writerow(["Jogo"] + [f"B{x+1}" for x in range(dez_per_jogo)])
+            w.writerow(["Jogo"] + [f"B{x+1}" for x in range(dez_por_jogo)])
             for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
             
             st.download_button("💾 Baixar Excel", csv_io.getvalue().encode('utf-8-sig'), 
-                             "jogos_gerados.csv", "text/csv", use_container_width=True)
+                             "jogos.csv", "text/csv", use_container_width=True)

@@ -146,4 +146,4 @@ with col_resultados:
                 st.download_button("💾 Baixar Planilha", output.getvalue().encode('utf-8-sig'), 
                                  "jogos.csv", "text/csv", use_container_width=True)
     else:
-        st.info("Selecione e clique em GERAR.")
+        st.info("Selecione, clique em GERAR e BOA SORTE!")

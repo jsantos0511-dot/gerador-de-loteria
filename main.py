@@ -5,77 +5,70 @@ import io
 
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# --- LÓGICA DE PERSISTÊNCIA NA URL ---
-# Lemos os números que já estão na URL
-params = st.query_params
-selecionados_na_url = params.get_all("n") # Pega todos os valores de 'n'
-selecionados = [int(x) for x in selecionados_na_url]
+# --- ESTADO DA SESSÃO (PERSISTENTE) ---
+if 'selecionados' not in st.session_state:
+    st.session_state.selecionados = set()
+if 'jogos_gerados' not in st.session_state:
+    st.session_state.jogos_gerados = None
+if 'custo_total' not in st.session_state:
+    st.session_state.custo_total = 0
 
-# Se houver um novo clique
-if "clique" in params:
-    num_clicado = int(params.get("clique"))
-    if num_clicado in selecionados:
-        selecionados.remove(num_clicado)
+# --- FUNÇÃO DE CALLBACK PARA O CLIQUE ---
+def processar_clique(n):
+    if n in st.session_state.selecionados:
+        st.session_state.selecionados.remove(n)
     else:
-        selecionados.append(num_clicado)
-    
-    # Atualiza a URL com a nova lista e recarrega
-    st.query_params.from_dict({"n": selecionados})
-    st.rerun()
+        st.session_state.selecionados.add(n)
 
-st.title("🎰 Gerador Pro")
+st.title("🎰 Gerador Pro Mobile")
 
-# --- VISUAL DO VOLANTE (HTML PURO) ---
+# --- VISUAL DO VOLANTE (HTML + CSS) ---
 st.subheader("Selecione as Dezenas")
-st.write(f"**Selecionados:** {len(selecionados)}/60")
+st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
 
-html_volante = """
-<style>
-    .grid-container {
+# CSS para forçar 6 colunas e botões bonitos
+st.markdown("""
+    <style>
+    .volante-container {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
         gap: 6px;
         width: 100%;
         max-width: 400px;
-        margin: 10px 0;
+        margin-bottom: 20px;
     }
-    .num-btn {
-        background-color: #F0F2F6;
-        border: 1px solid #D1D5DB;
-        border-radius: 6px;
-        height: 45px;
-        font-family: sans-serif;
-        font-weight: bold;
-        font-size: 16px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
-        color: #31333F;
+    .stButton > button {
+        width: 100% !important;
+        height: 45px !important;
+        font-weight: bold !important;
+        padding: 0 !important;
     }
-    .num-btn.active {
-        background-color: #FF4B4B;
-        color: white;
-        border-color: #FF4B4B;
+    /* Estilo para as métricas não quebrarem */
+    [data-testid="stMetric"] {
+        background: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
     }
-</style>
-<div class="grid-container">
-"""
+    </style>
+    """, unsafe_allow_html=True)
 
-# Criamos os links mantendo os números já selecionados na URL
-base_url = "?"
-for s in selecionados:
-    base_url += f"n={s}&"
-
-for i in range(1, 61):
-    clase = "num-btn active" if i in selecionados else "num-btn"
-    # Cada botão envia o seu número para o parâmetro 'clique'
-    url_botao = f"{base_url}clique={i}"
-    html_volante += f'<a href="{url_botao}" target="_self" class="{clase}">{i:02d}</a>'
-
-html_volante += "</div>"
-st.markdown(html_volante, unsafe_allow_html=True)
+# Renderização do Volante usando colunas do Streamlit dentro de uma div
+# O segredo é que o st.button nativo não faz refresh na página inteira
+with st.container():
+    for r in range(10):
+        cols = st.columns(6)
+        for c in range(6):
+            num = r * 6 + c + 1
+            is_sel = num in st.session_state.selecionados
+            # O botão do Streamlit preserva o estado sem recarregar a URL
+            if cols[c].button(
+                f"{num:02d}", 
+                key=f"v_{num}",
+                type="primary" if is_sel else "secondary",
+                use_container_width=True
+            ):
+                processar_clique(num)
+                st.rerun()
 
 st.divider()
 
@@ -94,19 +87,17 @@ f_fin = st.checkbox("🚫 Sem Finais Iguais", True)
 f_par = st.checkbox("⚖️ Equilibrar Par/Ímpar", True)
 max_p = st.slider("Máx. Pares", 1, dez_por_jogo, max(1, dez_por_jogo-1))
 
-b1, b2 = st.columns(2)
-if b1.button("❌ Limpar Tudo", use_container_width=True):
-    st.query_params.clear()
+col_b1, col_b2 = st.columns(2)
+if col_b1.button("❌ Limpar Tudo", use_container_width=True):
+    st.session_state.selecionados = set()
+    st.session_state.jogos_gerados = None
     st.rerun()
 
-gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
-
-# --- PROCESSAMENTO ---
-if gerar:
-    st.divider()
-    lista_n = sorted(selecionados)
+# Botão de Gerar
+if col_b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True):
+    lista_n = sorted(list(st.session_state.selecionados))
     if len(lista_n) < dez_por_jogo:
-        st.error(f"Selecione ao menos {dez_por_jogo} números!")
+        st.error("Selecione mais números!")
     else:
         with st.spinner("Gerando..."):
             combos = combinations(lista_n, dez_por_jogo)
@@ -120,16 +111,26 @@ if gerar:
                     if p > max_p or (len(j)-p) > max_p: continue
                 res.append(j)
                 if len(res) >= qtd_max: break
+            
+            # Salva no estado para não sumir ao rolar a tela
+            st.session_state.jogos_gerados = res
+            st.session_state.custo_total = len(res) * valor_unit
 
-            m1, m2 = st.columns(2)
-            m1.metric("Jogos", f"{len(res):,}".replace(",", "."))
-            m2.metric("Total", f"R$ {len(res)*valor_unit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            
-            st.dataframe(res[:500], use_container_width=True)
-            
-            csv_io = io.StringIO()
-            csv_io.write('\ufeff')
-            w = csv.writer(csv_io, delimiter=';')
-            w.writerow(["Jogo"] + [f"B{x+1}" for x in range(dez_por_jogo)])
-            for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
-            st.download_button("💾 Baixar Planilha", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)
+# --- EXIBIÇÃO DOS RESULTADOS (PERSISTENTE) ---
+if st.session_state.jogos_gerados is not None:
+    st.divider()
+    res = st.session_state.jogos_gerados
+    
+    m1, m2 = st.columns(2)
+    m1.metric("Jogos", f"{len(res):,}".replace(",", "."))
+    m2.metric("Total", f"R$ {st.session_state.custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    
+    st.dataframe(res[:500], use_container_width=True)
+    
+    csv_io = io.StringIO()
+    csv_io.write('\ufeff')
+    w = csv.writer(csv_io, delimiter=';')
+    w.writerow(["Jogo"] + [f"B{x+1}" for x in range(len(res[0]) if res else 6)])
+    for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
+    
+    st.download_button("💾 Baixar Planilha", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)

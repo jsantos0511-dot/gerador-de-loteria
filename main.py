@@ -32,7 +32,7 @@ st.markdown("""
         height: 30px !important;
         padding: 0 !important;
         font-weight: bold !important;
-        font-size: 12px !important;
+        font-size: 15px !important;
     }
 
     /* Garante que os campos de baixo NÃO herdem a grade de 6 */

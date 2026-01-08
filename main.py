@@ -6,37 +6,39 @@ import io
 # 1. Configuração da Página
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# 2. CSS Blindado para Mobile
+# 2. CSS com Medidas Fixas (px) para Mobile
 st.markdown("""
     <style>
-    /* Reset de margens para mobile */
-    .block-container { padding: 1rem 0.5rem !important; }
+    /* Reset de margens para o celular */
+    .block-container { padding: 0.5rem !important; }
 
-    /* FORÇAR GRADE: Criamos uma regra que ataca o container do volante sem erro */
-    [data-testid="stHorizontalBlock"].volante-container {
+    /* Forçamos a grade de 6 colunas no container do volante */
+    .volante-container div[data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: repeat(6, 1fr) !important;
+        grid-template-columns: repeat(6, 40px) !important; /* 6 colunas de 40px */
         gap: 5px !important;
-    }
-    
-    /* Impede o empilhamento das colunas individuais */
-    [data-testid="stHorizontalBlock"].volante-container [data-testid="column"] {
-        width: 100% !important;
-        flex: 1 !important;
-        min-width: 0 !important;
+        justify-content: center; /* Centraliza o volante na tela */
     }
 
-    /* Estilo dos botões */
+    /* Removemos qualquer interferência das colunas do Streamlit */
+    .volante-container div[data-testid="column"] {
+        width: 40px !important;
+        min-width: 40px !important;
+        flex: none !important;
+    }
+
+    /* Botões com tamanhos fixos solicitados */
     .stButton > button {
         width: 40px !important;
         height: 30px !important;
         padding: 0 !important;
-        font-weight: bold !important;
         font-size: 15px !important;
+        font-weight: bold !important;
+        line-height: 30px !important; /* Alinha o texto no centro */
     }
 
-    /* Garante que os campos de baixo NÃO herdem a grade de 6 */
-    .config-area [data-testid="stHorizontalBlock"] {
+    /* Garante que o restante do app use o layout normal do Streamlit */
+    .area-normal div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         grid-template-columns: none !important;
     }
@@ -54,11 +56,10 @@ st.title("🎰 Gerador Pro")
 st.subheader("Selecione as Dezenas")
 st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
 
-# O segredo: Injetamos um marcador HTML antes de cada linha para o CSS "pegar"
+# Aplicamos o container para isolar o volante
+st.markdown('<div class="volante-container">', unsafe_allow_html=True)
+
 for r in range(10):
-    # Esta div vazia ajuda o Streamlit a agrupar as colunas, 
-    # e o CSS acima força a grade.
-    st.markdown('<div class="volante-container">', unsafe_allow_html=True)
     cols = st.columns(6)
     for c in range(6):
         num = r * 6 + c + 1
@@ -71,40 +72,42 @@ for r in range(10):
             if is_sel: st.session_state.selecionados.remove(num)
             else: st.session_state.selecionados.add(num)
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
-# --- CONFIGURAÇÕES E FILTROS ---
-st.markdown('<div class="config-area">', unsafe_allow_html=True)
+# --- CONFIGURAÇÕES E FILTROS (ÁREA NORMAL) ---
+st.markdown('<div class="area-normal">', unsafe_allow_html=True)
 
-c1, c2 = st.columns(2)
-with c1:
-    dez_por_jogo = st.number_input("Dezenas/jogo", 1, 20, 6)
-    valor_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
-with c2:
-    gerar_tudo = st.checkbox("Gerar Todas")
-    qtd_max = 1048576 if gerar_tudo else st.number_input("Qtd Jogos", 1, 1000000, 50)
+with st.container():
+    c1, c2 = st.columns(2)
+    with c1:
+        dez_por_jogo = st.number_input("Dezenas/jogo", 1, 20, 6)
+        valor_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
+    with c2:
+        gerar_tudo = st.checkbox("Gerar Todas")
+        qtd_max = 1048576 if gerar_tudo else st.number_input("Qtd Jogos", 1, 1000000, 50)
 
-st.markdown("### Filtros")
-f_seq = st.checkbox("🚫 Sem Sequências", True)
-f_fin = st.checkbox("🚫 Sem Finais Iguais", True)
-f_par = st.checkbox("⚖️ Equilibrar Par/Ímpar", True)
-max_p = st.slider("Máx. Pares", 1, dez_por_jogo, max(1, dez_por_jogo-1))
+    st.markdown("### Filtros")
+    f_seq = st.checkbox("🚫 Sem Sequências", True)
+    f_fin = st.checkbox("🚫 Sem Finais Iguais", True)
+    f_par = st.checkbox("⚖️ Equilibrar Par/Ímpar", True)
+    max_p = st.slider("Máx. Pares", 1, dez_por_jogo, max(1, dez_por_jogo-1))
 
-b1, b2 = st.columns(2)
-if b1.button("❌ Limpar", use_container_width=True):
-    st.session_state.selecionados = set()
-    st.session_state.limpar_count += 1
-    st.rerun()
-gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
+    col_btn1, col_btn2 = st.columns(2)
+    if col_btn1.button("❌ Limpar Seleção", use_container_width=True):
+        st.session_state.selecionados = set()
+        st.session_state.limpar_count += 1
+        st.rerun()
+    
+    gerar = col_btn2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
 
-# --- RESULTADOS ---
+# --- PROCESSAMENTO E RESULTADOS ---
 if gerar:
-    st.divider()
     lista_n = sorted(list(st.session_state.selecionados))
     if len(lista_n) < dez_por_jogo:
-        st.error("Selecione os números!")
+        st.error(f"Selecione ao menos {dez_por_jogo} números!")
     else:
         with st.spinner("Gerando..."):
             combos = combinations(lista_n, dez_por_jogo)
@@ -119,6 +122,7 @@ if gerar:
                 res.append(j)
                 if len(res) >= qtd_max: break
 
+            st.divider()
             m1, m2 = st.columns(2)
             m1.metric("Jogos", f"{len(res):,}".replace(",", "."))
             m2.metric("Total", f"R$ {len(res)*valor_unit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -128,7 +132,7 @@ if gerar:
             csv_io = io.StringIO()
             csv_io.write('\ufeff')
             w = csv.writer(csv_io, delimiter=';')
-            w.writerow(["Jogo"] + [f"B1", "B2", "B3", "B4", "B5", "B6"][:dez_por_jogo])
+            w.writerow(["Jogo"] + [f"B{x+1}" for x in range(dez_por_jogo)])
             for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
             st.download_button("💾 Baixar Excel", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)
 

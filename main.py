@@ -18,24 +18,45 @@ TEMAS = {
 }
 
 # --- CONTROLE DE NAVEGAÇÃO ---
-# Verificamos se há um comando de mudança de página via URL ou estado
-query_params = st.query_params
-if "p" in query_params:
-    st.session_state.pagina = query_params["p"]
-
 if 'pagina' not in st.session_state:
     st.session_state.pagina = "Início"
 
 p_atual = st.session_state.pagina
-cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#00FF00"
+cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS GLOBAL (DARK MODE PURO)
+# 2. CSS PARA O MENU DARK E CARDS
+estilos_botoes = ""
+for nome, dados in TEMAS.items():
+    estilos_botoes += f"""
+    div[data-testid="stButton"] button[key="btn_{nome}"] {{
+        height: 120px !important;
+        background-color: #0e1117 !important;
+        border: 2px solid {dados['cor']} !important;
+        color: {dados['cor']} !important;
+        border-radius: 15px !important;
+        font-weight: bold !important;
+        font-size: 22px !important;
+        margin-bottom: 10px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+    }}
+    div[data-testid="stButton"] button[key="btn_{nome}"]:hover {{
+        background-color: {dados['cor']}20 !important;
+        border-color: #ffffff !important;
+        color: #ffffff !important;
+    }}
+    """
+
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
-    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 20px; }}
+    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
     
+    /* Customização dos Cards na Home */
+    {estilos_botoes}
+
     /* Estilo do Volante */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
@@ -44,19 +65,6 @@ st.markdown(f"""
         gap: 4px !important;
     }}
     
-    /* Estilo dos Links de Loteria */
-    .link-loteria {{
-        text-decoration: none !important;
-        color: inherit !important;
-        display: block;
-        width: 100%;
-        height: 100%;
-    }}
-    .link-loteria:hover {{
-        transform: scale(1.02);
-        transition: 0.2s;
-    }}
-
     [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
@@ -84,40 +92,16 @@ def home():
     st.write("---")
     
     col1, col2 = st.columns(2)
-    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # CARD TODO CLICÁVEL VIA HTML + LINK
-            # Usamos o próprio Streamlit para mudar o estado ao clicar
-            if st.button(f"{nome}", key=f"btn_{nome}", use_container_width=True, help=f"Entrar na {nome}"):
+            # O próprio botão é o card. O texto é apenas o nome.
+            if st.button(nome, key=f"btn_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 
-            # Estilização forçada do botão acima para parecer um Card
-            st.markdown(f"""
-                <style>
-                div[data-testid="stButton"] button[key="btn_{nome}"] {{
-                    height: 100px !important;
-                    background-color: #0e1117 !important;
-                    border: 2px solid {dados['cor']} !important;
-                    color: {dados['cor']} !important;
-                    font-size: 22px !important;
-                    font-weight: bold !important;
-                    border-radius: 15px !important;
-                    margin-top: -55px !important;
-                    margin-bottom: 20px !important;
-                }}
-                div[data-testid="stButton"] button[key="btn_{nome}"]:hover {{
-                    background-color: {dados['cor']}20 !important;
-                    color: white !important;
-                }}
-                </style>
-                <div style="text-align: center; margin-bottom: 10px; font-size: 24px;">🍀</div>
-            """, unsafe_allow_html=True)
-
 def gerador_loteria(nome, config):
-    if st.button("⬅️ Voltar ao Início", use_container_width=True):
+    if st.button("⬅️ Menu Inicial", use_container_width=True):
         st.session_state.pagina = "Início"
         st.rerun()
 
@@ -131,7 +115,7 @@ def gerador_loteria(nome, config):
         if st.button("🎲 Surpresinha", use_container_width=True):
             st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar Seleção", use_container_width=True):
+        if st.button("❌ Limpar", use_container_width=True):
             st.session_state[key_sel] = []
             st.rerun()
 
@@ -143,7 +127,7 @@ def gerador_loteria(nome, config):
 
     col_a, col_b = st.columns(2)
     with col_a:
-        dez_por_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
+        dez_por_jogo = st.number_input("Bolas por jogo", config['min_sel'], config['total'], config['min_sel'])
         valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
     with col_b:
         gerar_tudo = st.checkbox("Gerar TODAS")
@@ -151,13 +135,13 @@ def gerador_loteria(nome, config):
 
     with st.expander("🛠️ Filtros"):
         f_s = st.checkbox("🚫 Evitar Sequências")
-        f_f = st.checkbox("🚫 Evitar Finais Repetidos")
-        f_p = st.checkbox("⚖️ Par/Ímpar")
+        f_f = st.checkbox("🚫 Evitar Finais Iguais")
+        f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
         m_p = st.slider("Máx. Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
     if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
-            st.error(f"Selecione {dez_por_jogo} números!")
+            st.error(f"Selecione no mínimo {dez_por_jogo} números!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
             with st.spinner("Gerando..."):
@@ -167,13 +151,13 @@ def gerador_loteria(nome, config):
                 if res:
                     st.success(f"{len(res)} jogos!")
                     st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
-                    df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
+                    df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
                     st.dataframe(df, use_container_width=True)
                     
                     csv_io = io.StringIO()
                     csv_io.write('\ufeff')
                     w = csv.writer(csv_io, delimiter=';')
-                    w.writerow(["Jogo"] + [f"D{i+1}" for i in range(dez_por_jogo)])
+                    w.writerow(["ID"] + [f"B{i+1}" for i in range(dez_por_jogo)])
                     for idx, r in enumerate(res):
                         w.writerow([idx + 1] + [f"{n:02d}" for n in r])
                     st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", "text/csv", use_container_width=True)

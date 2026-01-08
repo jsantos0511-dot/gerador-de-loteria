@@ -30,7 +30,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎰 Gerador Pro")
+st.title("🎰 Gerador Mega Sena")
 
 if 'selecionados' not in st.session_state:
     st.session_state.selecionados = []

@@ -5,55 +5,54 @@ import io
 
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# 1. Inicialização do Estado
+# --- 1. MEMÓRIA DO SERVIDOR (ESTADO) ---
+# Usamos o session_state para garantir que os dados não sumam no recarregamento
 if 'selecionados' not in st.session_state:
-    st.session_state.selecionados = []
+    st.session_state.selecionados = set()
 
-# 2. Lógica de clique via Parâmetros de URL (Query Params)
+# --- 2. LÓGICA DE CLIQUE (LÊ A URL E GUARDA NA MEMÓRIA) ---
 params = st.query_params
 if "add" in params:
-    num = int(params["add"])
-    if num in st.session_state.selecionados:
-        st.session_state.selecionados.remove(num)
+    num_clicado = int(params["add"])
+    if num_clicado in st.session_state.selecionados:
+        st.session_state.selecionados.remove(num_clicado)
     else:
-        st.session_state.selecionados.append(num)
+        st.session_state.selecionados.add(num_clicado)
+    
+    # Limpa os parâmetros da URL para o próximo clique ser limpo
     st.query_params.clear()
     st.rerun()
 
-# 3. CSS para a Tabela do Volante
+# --- 3. CSS PARA A TABELA (SUA ESTÉTICA APROVADA) ---
 st.markdown("""
     <style>
     .block-container { padding: 1rem 0.5rem !important; }
-    
-    /* A TABELA É IMUTÁVEL */
     .volante-table {
         width: 100%;
-        max-width: 400px;
+        max-width: 450px;
         border-collapse: separate;
-        border-spacing: 4px;
+        border-spacing: 5px;
         margin: 10px 0;
     }
-    .volante-table td {
-        width: 16.66%; /* Força 6 colunas exatas */
-    }
+    .volante-table td { width: 16.66%; }
     .num-link {
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 45px;
+        height: 48px;
         background-color: #f0f2f6;
         border: 1px solid #d1d5db;
-        border-radius: 6px;
+        border-radius: 8px;
         text-decoration: none !important;
         color: #31333f !important;
         font-weight: bold;
-        font-size: 16px;
+        font-size: 18px;
         font-family: sans-serif;
     }
     .num-link.selected {
-        background-color: #ff4b4b !important;
+        background-color: #FF4B4B !important;
         color: white !important;
-        border-color: #ff4b4b;
+        border-color: #FF4B4B;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -62,12 +61,13 @@ st.title("🎰 Gerador Pro")
 st.subheader("Selecione as Dezenas")
 st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
 
-# 4. Construção do Volante em HTML (Tabela Rígida)
+# --- 4. CONSTRUÇÃO DA TABELA (ESTRUTURA RÍGIDA) ---
 html_table = '<table class="volante-table">'
 for row in range(10):
     html_table += '<tr>'
     for col in range(6):
         n = row * 6 + col + 1
+        # Verifica na memória (session_state) se o número está ativo
         sel_class = "selected" if n in st.session_state.selecionados else ""
         html_table += f'<td><a href="?add={n}" target="_self" class="num-link {sel_class}">{n:02d}</a></td>'
     html_table += '</tr>'
@@ -77,8 +77,7 @@ st.markdown(html_table, unsafe_allow_html=True)
 
 st.divider()
 
-# --- ÁREA DE CONFIGURAÇÕES (Protegida) ---
-# Usamos o container para isolar os componentes nativos
+# --- 5. CONFIGURAÇÕES E FILTROS ---
 with st.container():
     c1, c2 = st.columns(2)
     with c1:
@@ -96,13 +95,14 @@ with st.container():
 
     b1, b2 = st.columns(2)
     if b1.button("❌ Limpar Seleção", use_container_width=True):
-        st.session_state.selecionados = []
+        st.session_state.selecionados = set()
         st.rerun()
+    
     gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
 
-# 5. Processamento e Resultados
+# --- 6. PROCESSAMENTO E RESULTADOS ---
 if gerar:
-    lista_n = sorted(st.session_state.selecionados)
+    lista_n = sorted(list(st.session_state.selecionados))
     if len(lista_n) < dez_por_jogo:
         st.error(f"Selecione ao menos {dez_por_jogo} números!")
     else:
@@ -123,6 +123,7 @@ if gerar:
             m1, m2 = st.columns(2)
             m1.metric("Total Jogos", f"{len(res):,}".replace(",", "."))
             m2.metric("Valor Total", f"R$ {len(res)*valor_unit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            
             st.dataframe(res[:500], use_container_width=True)
             
             csv_io = io.StringIO()
@@ -130,4 +131,5 @@ if gerar:
             w = csv.writer(csv_io, delimiter=';')
             w.writerow(["Jogo"] + [f"B{x+1}" for x in range(len(res[0]) if res else 6)])
             for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
+            
             st.download_button("💾 Baixar Excel", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)

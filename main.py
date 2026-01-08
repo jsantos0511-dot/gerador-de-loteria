@@ -26,6 +26,7 @@ st.markdown("""
     /* Botão solicitado: Altura otimizada e fonte 15px */
     .volante-grid button {
         height: 35px !important;
+        width: 100% !important;
         font-size: 15px !important;
         font-weight: bold !important;
         padding: 0 !important;

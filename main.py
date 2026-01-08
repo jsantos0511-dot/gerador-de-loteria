@@ -7,88 +7,77 @@ import random
 # 1. Configuração da Página
 st.set_page_config(page_title="Loteria Mobile", layout="centered")
 
-# 2. Inicialização do Estado
-if 'selecionados' not in st.session_state:
-    st.session_state.selecionados = set()
-
-# 3. CSS para Forçar Botões Pequenos e Lado a Lado
+# 2. CSS para deixar o seletor com cara de volante de loteria
 st.markdown("""
     <style>
-    /* Remove o limite de largura que faz o Streamlit empilhar colunas */
-    [data-testid="column"] {
-        min-width: 0px !important;
-        flex: 1 1 0% !important;
-        padding: 2px !important;
+    /* Estiliza os botões do seletor para serem circulares/quadrados pequenos */
+    button[role="option"] {
+        min-width: 45px !important;
+        height: 40px !important;
+        justify-content: center !important;
+        font-weight: bold !important;
     }
     
-    /* Estilo dos botões nativos para parecerem Chips */
-    .stButton > button {
-        width: 100% !important;
-        height: 38px !important;
-        padding: 0px !important;
-        font-size: 14px !important;
-        font-weight: bold !important;
-        border-radius: 8px !important;
-    }
-
-    /* Reduz margens do app para mobile */
-    .block-container { padding: 1rem 0.5rem !important; }
+    /* Garante que o container ocupe a largura total sem margens laterais grandes */
+    .block-container { padding: 1rem 0.6rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🎰 Gerador Pro")
 
-# --- VOLANTE ---
-st.subheader("Selecione as Dezenas")
-st.write(f"**Marcados:** {len(st.session_state.selecionados)}")
+# --- ESTADO DA SESSÃO ---
+if 'selecionados' not in st.session_state:
+    st.session_state.selecionados = []
 
-# Botões de Ações Rápidas
-c_sup1, c_sup2 = st.columns(2)
-with c_sup1:
+# --- FUNÇÃO SURPRESINHA ---
+def surpresinha():
+    opcoes = [f"{i:02d}" for i in range(1, 61)]
+    st.session_state.selecionados = random.sample(opcoes, 6)
+
+st.subheader("Escolha suas dezenas")
+
+# Botões de ação rápida
+c1, c2 = st.columns(2)
+with c1:
     if st.button("🎲 Surpresinha", use_container_width=True):
-        st.session_state.selecionados = set(random.sample(range(1, 61), 6))
-        st.rerun()
-with c_sup2:
-    if st.button("❌ Limpar Tudo", use_container_width=True):
-        st.session_state.selecionados = set()
+        surpresinha()
+with c2:
+    if st.button("❌ Limpar", use_container_width=True):
+        st.session_state.selecionados = []
         st.rerun()
 
-# --- GRADE DE BOTÕES (6 COLUNAS QUE NÃO QUEBRAM) ---
-# Em vez de 10 linhas, vamos criar blocos menores para o Streamlit aceitar melhor
-for linha in range(10):
-    cols = st.columns(6) # Criamos 6 colunas reais
-    for coluna in range(6):
-        num = linha * 6 + coluna + 1
-        is_sel = num in st.session_state.selecionados
-        
-        # O segredo: use_container_width=True faz ele respeitar a largura da mini-coluna
-        if cols[coluna].button(
-            f"{num:02d}", 
-            key=f"n_{num}", 
-            type="primary" if is_sel else "secondary",
-            use_container_width=True
-        ):
-            if is_sel:
-                st.session_state.selecionados.remove(num)
-            else:
-                st.session_state.selecionados.add(num)
-            st.rerun()
+# 3. O SEGREDO: st.segmented_control
+# Este componente foi feito para seleções múltiplas de forma compacta
+opcoes_volante = [f"{i:02d}" for i in range(1, 61)]
+
+selecionados_finais = st.segmented_control(
+    "Toque nos números para selecionar:",
+    options=opcoes_volante,
+    selection_mode="multi", # Permite escolher vários
+    key="selecionados",     # Conectado ao session_state
+    label_visibility="collapsed"
+)
+
+qtd = len(selecionados_finais)
+st.write(f"**Selecionados:** {qtd}/60")
 
 st.divider()
 
-# --- CONFIGURAÇÕES E GERAÇÃO ---
+# --- ÁREA DE CÁLCULO ---
 col_a, col_b = st.columns(2)
 with col_a:
     dez_por_jogo = st.number_input("Dezenas por jogo", 6, 20, 6)
     valor_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
 with col_b:
-    qtd_max = st.number_input("Limite de jogos", 1, 1000000, 50)
+    qtd_max = st.number_input("Limite de jogos", 1, 1000000, 100)
 
 if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
-    lista_n = sorted(list(st.session_state.selecionados))
-    if len(lista_n) < dez_por_jogo:
-        st.error(f"Selecione ao menos {dez_por_jogo} números!")
+    if len(selecionados_finais) < dez_por_jogo:
+        st.error(f"Selecione pelo menos {dez_por_jogo} números.")
     else:
+        # Converte strings '01' para inteiros 1 para o cálculo
+        lista_n = sorted([int(x) for x in selecionados_finais])
+        
         with st.spinner("Gerando..."):
             combos = combinations(lista_n, dez_por_jogo)
             res = []
@@ -98,8 +87,10 @@ if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
             
             if res:
                 st.success(f"{len(res)} jogos gerados!")
+                st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
                 st.dataframe(res, use_container_width=True)
                 
+                # Exportação CSV
                 csv_io = io.StringIO()
                 csv_io.write('\ufeff')
                 w = csv.writer(csv_io, delimiter=';')

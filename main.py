@@ -22,16 +22,43 @@ if 'pagina' not in st.session_state:
     st.session_state.pagina = "Início"
 
 p_atual = st.session_state.pagina
-cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#00FF00"
+cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS GLOBAL (DARK MODE)
+# 2. CSS DINÂMICO (DARK MODE + CARDS COLORIDOS)
+estilos_cards = ""
+for nome, dados in TEMAS.items():
+    estilos_cards += f"""
+    /* Formata o botão para parecer um Card */
+    div[data-testid="stButton"] button[key="btn_{nome}"] {{
+        height: 120px !important;
+        background-color: #0e1117 !important;
+        border: 2px solid {dados['cor']} !important;
+        color: {dados['cor']} !important;
+        border-radius: 15px !important;
+        font-weight: bold !important;
+        font-size: 24px !important;
+        margin-bottom: 20px !important;
+        transition: 0.3s !important;
+    }}
+    /* Efeito ao passar o mouse */
+    div[data-testid="stButton"] button[key="btn_{nome}"]:hover {{
+        background-color: {dados['cor']}20 !important;
+        border-color: #ffffff !important;
+        color: #ffffff !important;
+        transform: translateY(-3px) !important;
+    }}
+    """
+
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
-    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 20px; }}
+    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
     
-    /* Estilo do Volante */
+    /* Injeção dos estilos dos botões-cards */
+    {estilos_cards}
+
+    /* Estilo do Volante (Segmented Control) */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
@@ -39,7 +66,6 @@ st.markdown(f"""
         gap: 4px !important;
     }}
     
-    /* Esconder Sidebar */
     [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
@@ -67,27 +93,12 @@ def home():
     st.write("---")
     
     col1, col2 = st.columns(2)
-    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # CARD VISUAL (HTML)
-            st.markdown(f"""
-                <div style="
-                    border: 2px solid {dados['cor']}; 
-                    border-radius: 15px; 
-                    padding: 15px; 
-                    text-align: center; 
-                    background-color: #0e1117;
-                    margin-bottom: 10px;
-                ">
-                    <span style="font-size: 30px;">🍀</span><br>
-                    <span style="color: {dados['cor']}; font-weight: bold; font-size: 20px; font-family: sans-serif;">{nome}</span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # BOTÃO DE NAVEGAÇÃO (ESTILIZADO)
-            if st.button(f"Selecionar {nome}", key=f"btn_{nome}", use_container_width=True):
+            # O próprio botão agora é o Card. O texto é apenas o Nome.
+            # O trevo 🍀 é opcional, deixei dentro do nome para manter o estilo
+            if st.button(f"🍀 {nome}", key=f"btn_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 
@@ -101,7 +112,6 @@ def gerador_loteria(nome, config):
     key_sel = f"sel_{nome}"
     if key_sel not in st.session_state: st.session_state[key_sel] = []
     
-    # Comandos Rápidos
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🎲 Surpresinha", use_container_width=True):
@@ -111,13 +121,11 @@ def gerador_loteria(nome, config):
             st.session_state[key_sel] = []
             st.rerun()
 
-    # Volante
     opcoes = [f"{i:02d}" for i in range(1, config['total'] + 1)]
     selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=key_sel, label_visibility="collapsed")
     
     st.info(f"**{len(selecionados)}** números selecionados")
 
-    # Configurações do Jogo
     col_a, col_b = st.columns(2)
     with col_a:
         dez_por_jogo = st.number_input("Dezenas por jogo", config['min_sel'], config['total'], config['min_sel'])
@@ -126,14 +134,12 @@ def gerador_loteria(nome, config):
         gerar_tudo = st.checkbox("Gerar TODAS possíveis")
         qtd_max = st.number_input("Limite de jogos", 1, 1000000, 100, disabled=gerar_tudo)
 
-    # Filtros
     with st.expander("🛠️ Filtros Inteligentes"):
         f_s = st.checkbox("🚫 Evitar Sequências")
         f_f = st.checkbox("🚫 Evitar Finais Repetidos")
         f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
         m_p = st.slider("Máximo de Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
-    # Botão de Ação
     if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
             st.error(f"Selecione pelo menos {dez_por_jogo} números no volante!")
@@ -144,19 +150,18 @@ def gerador_loteria(nome, config):
                 res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
                 
                 if res:
-                    st.success(f"{len(res)} jogos gerados com sucesso!")
+                    st.success(f"{len(res)} jogos gerados!")
                     st.metric("Investimento", f"R$ {len(res)*valor_unit:,.2f}")
                     df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
                     st.dataframe(df, use_container_width=True)
                     
-                    # CSV Export
                     csv_io = io.StringIO()
                     csv_io.write('\ufeff')
                     w = csv.writer(csv_io, delimiter=';')
                     w.writerow(["Jogo"] + [f"D{i+1}" for i in range(dez_por_jogo)])
                     for idx, r in enumerate(res):
                         w.writerow([idx + 1] + [f"{n:02d}" for n in r])
-                    st.download_button("💾 Baixar Jogos (CSV)", csv_io.getvalue().encode('utf-8-sig'), f"jogos_{nome.lower()}.csv", "text/csv", use_container_width=True)
+                    st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"jogos_{nome.lower()}.csv", "text/csv", use_container_width=True)
 
 # --- NAVEGAÇÃO ---
 if st.session_state.pagina == "Início":

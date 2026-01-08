@@ -13,7 +13,7 @@ st.markdown("""
     <style>
     /* Reduz o tamanho do título principal */
     h1 {
-        font-size: 2.8rem !important;
+        font-size: 2.3rem !important;
         text-align: center;
     }
     
@@ -35,7 +35,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎰 Gerador de Mega Sena")
+st.title("🎰 Mega Sena")
 
 # Inicialização do estado da sessão
 if 'selecionados' not in st.session_state:

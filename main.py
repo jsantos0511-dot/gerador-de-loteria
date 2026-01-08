@@ -9,7 +9,6 @@ import pandas as pd
 st.set_page_config(page_title="Portal Loterias Pro", layout="centered")
 
 # --- DICIONÁRIO DE CONFIGURAÇÕES ---
-# O ícone 🍀 agora é o padrão para identificar as modalidades
 TEMAS = {
     "Mega-Sena": {"cor": "#209869", "total": 60, "cols": 6, "min_sel": 6, "preco": 5.0, "icone": "🍀"},
     "Lotofácil": {"cor": "#930089", "total": 25, "cols": 5, "min_sel": 15, "preco": 3.0, "icone": "🍀"},
@@ -26,7 +25,31 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#31333F"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS DINÂMICO
+# 2. CSS DINÂMICO CUSTOMIZADO
+# Aqui geramos o CSS para cada card individualmente usando sua cor
+estilo_cards = ""
+for nome, dados in TEMAS.items():
+    estilo_cards += f"""
+    button[key="card_{nome}"] {{
+        height: 110px !important;
+        background-color: white !important;
+        border: 2px solid {dados['cor']} !important;
+        border-radius: 12px !important;
+        font-size: 1.1rem !important;
+        font-weight: bold !important;
+        color: {dados['cor']} !important;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.05) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: pre-line !important;
+    }}
+    button[key="card_{nome}"]:hover {{
+        background-color: {dados['cor']}10 !important; /* Fundo leve com a cor da loteria no hover */
+    }}
+    """
+
 st.markdown(f"""
     <style>
     .titulo-custom {{ color: {cor_tema}; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
@@ -40,24 +63,10 @@ st.markdown(f"""
     }}
     button[role="option"] {{ min-width: 0px !important; width: 100% !important; height: 42px !important; font-weight: bold !important; }}
 
-    /* CSS EXCLUSIVO PARA OS CARDS DA HOME */
-    div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"] > div > div > div[data-testid="stButton"] > button[key^="card_"] {{
-        height: 110px !important;
-        background-color: white !important;
-        border: 2px solid #f0f2f6 !important;
-        border-radius: 12px !important;
-        font-size: 1.1rem !important;
-        font-weight: bold !important;
-        color: #333 !important;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.05) !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
-        white-space: pre-line !important; /* Permite a quebra de linha para o trevo ficar em cima */
-    }}
+    /* Injeção dos estilos dos cards individuais */
+    {estilo_cards}
 
-    /* Estilo padrão para os demais botões */
+    /* Estilo padrão para botões de ação */
     .stButton > button {{ border-radius: 8px !important; }}
     
     [data-testid="stSidebar"] {{ display: none; }}
@@ -89,7 +98,6 @@ def home():
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # Texto do botão com o trevo em destaque
             if st.button(f"🍀\n{nome}", key=f"card_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()

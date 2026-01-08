@@ -148,3 +148,6 @@ if gerar:
                 
                 st.download_button("💾 Baixar Jogos (CSV)", csv_io.getvalue().encode('utf-8-sig'), 
                                  "meus_jogos_loteria.csv", "text/csv", use_container_width=True)
+
+
+#final do código

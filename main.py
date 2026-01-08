@@ -20,7 +20,7 @@ st.markdown("""
     .volante-grid div[data-testid="column"] {
         width: 100% !important;
         min-width: 0 !important;
-        flex: 5 !important;
+        flex: 1 !important;
     }
 
     /* Botão solicitado: Altura otimizada e fonte 15px */

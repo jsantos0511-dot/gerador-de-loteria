@@ -5,9 +5,9 @@ import io
 import random
 
 # 1. Configuração da Página
-st.set_page_config(page_title="Loteria Mobile", layout="centered")
+st.set_page_config(page_title="Gerador Loteria", layout="centered")
 
-# 2. CSS para visual de botões de loteria
+# 2. Estilização dos componentes para Mobile
 st.markdown("""
     <style>
     button[role="option"] {
@@ -54,7 +54,7 @@ selecionados_finais = st.segmented_control(
 st.write(f"**Selecionados:** {len(selecionados_finais)}/60")
 st.divider()
 
-# --- ÁREA DE CONFIGURAÇÃO ---
+# --- CONFIGURAÇÕES ---
 col_a, col_b = st.columns(2)
 with col_a:
     dez_por_jogo = st.number_input("Dezenas por jogo", 6, 20, 6)
@@ -76,27 +76,33 @@ if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
                 if len(res) >= qtd_max: break
             
             if res:
-                st.success(f"{len(res)} jogos gerados!")
+                st.success(f"{len(res)} combinações geradas!")
                 
-                # --- AJUSTE DA TABELA PARA COMEÇAR EM 1 ---
-                # Criamos um dicionário onde a chave é "Jogo X" começando de 1
-                dados_tabela = {f"Jogo {i+1}": jogo for i, jogo in enumerate(res)}
-                st.dataframe(dados_tabela, use_container_width=True)
+                # --- TABELA COM CABEÇALHO 'BOLA X' E ÍNDICE INICIANDO EM 1 ---
+                colunas_bolas = [f"Bola {x+1}" for x in range(dez_por_jogo)]
                 
-                # --- AJUSTE DO CSV PARA COMEÇAR EM 1 ---
+                # Criamos o DataFrame formatando os números com dois dígitos (01, 02...)
+                # O índice [1, 2, 3...] substitui a palavra 'Jogo'
+                import pandas as pd
+                df_final = pd.DataFrame(res, columns=colunas_bolas)
+                df_final.index = df_final.index + 1 
+                
+                st.dataframe(df_final, use_container_width=True)
+                
+                # --- CSV PARA DOWNLOAD ---
                 csv_io = io.StringIO()
                 csv_io.write('\ufeff')
                 w = csv.writer(csv_io, delimiter=';')
-                w.writerow(["ID Jogo"] + [f"Dezena {x+1}" for x in range(dez_por_jogo)])
+                # Cabeçalho do CSV
+                w.writerow(["ID"] + colunas_bolas)
                 
                 for idx, r in enumerate(res):
-                    # Aqui somamos 1 ao idx para o arquivo CSV também vir correto
                     w.writerow([idx + 1] + [f"{n:02d}" for n in r])
                 
                 st.download_button(
-                    "💾 Baixar Planilha (CSV)", 
+                    "💾 Baixar Planilha", 
                     csv_io.getvalue().encode('utf-8-sig'), 
-                    "meus_jogos.csv", 
+                    "jogos_gerados.csv", 
                     "text/csv", 
                     use_container_width=True
                 )

@@ -13,14 +13,14 @@ st.markdown("""
     .volante-grid div[data-testid="stHorizontalBlock"] {
         display: grid !important;
         grid-template-columns: repeat(6, 1fr) !important;
-        gap: 3px !important;
-        width: 50% !important;
+        gap: 6px !important;
+        width: 100% !important;
     }
 
     .volante-grid div[data-testid="column"] {
         width: 100% !important;
         min-width: 0 !important;
-        flex: 1 !important;
+        flex: 5 !important;
     }
 
     /* Botão solicitado: Altura otimizada e fonte 15px */

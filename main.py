@@ -3,21 +3,30 @@ import csv
 from itertools import combinations
 import io
 import random
+import pandas as pd
 
 # 1. Configuração da Página
 st.set_page_config(page_title="Gerador Loteria", layout="centered")
 
-# 2. Estilização dos componentes para Mobile
+# 2. Estilização Mobile com Aumento de Fonte no Volante
 st.markdown("""
     <style>
+    /* Estiliza os botões do seletor (Volante) */
     button[role="option"] {
-        min-width: 45px !important;
-        height: 40px !important;
+        min-width: 48px !important;
+        height: 45px !important;
         justify-content: center !important;
         font-weight: bold !important;
         border-radius: 8px !important;
+        /* Aumentado em 3px (de 16px para 19px) */
+        font-size: 19px !important; 
     }
+    
+    /* Ajuste para o texto não ficar colado na borda no mobile */
     .block-container { padding: 1rem 0.6rem !important; }
+    
+    /* Melhora a legibilidade do cabeçalho da tabela */
+    [data-testid="stHeader"] { font-size: 14px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -43,6 +52,7 @@ with c2:
 
 opcoes_volante = [f"{i:02d}" for i in range(1, 61)]
 
+# Componente Segmented Control (Volante)
 selecionados_finais = st.segmented_control(
     "Toque nos números:",
     options=opcoes_volante,
@@ -78,13 +88,13 @@ if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
             if res:
                 st.success(f"{len(res)} combinações geradas!")
                 
-                # --- TABELA COM CABEÇALHO 'BOLA X' E ÍNDICE INICIANDO EM 1 ---
+                # Cabeçalhos Bola 1, Bola 2...
                 colunas_bolas = [f"Bola {x+1}" for x in range(dez_por_jogo)]
                 
-                # Criamos o DataFrame formatando os números com dois dígitos (01, 02...)
-                # O índice [1, 2, 3...] substitui a palavra 'Jogo'
-                import pandas as pd
-                df_final = pd.DataFrame(res, columns=colunas_bolas)
+                # Formatação com 2 dígitos para a tabela
+                res_formatado = [[f"{n:02d}" for n in jogo] for jogo in res]
+                
+                df_final = pd.DataFrame(res_formatado, columns=colunas_bolas)
                 df_final.index = df_final.index + 1 
                 
                 st.dataframe(df_final, use_container_width=True)
@@ -93,7 +103,6 @@ if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
                 csv_io = io.StringIO()
                 csv_io.write('\ufeff')
                 w = csv.writer(csv_io, delimiter=';')
-                # Cabeçalho do CSV
                 w.writerow(["ID"] + colunas_bolas)
                 
                 for idx, r in enumerate(res):

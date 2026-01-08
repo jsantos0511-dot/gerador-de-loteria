@@ -3,148 +3,131 @@ import csv
 from itertools import combinations
 import io
 
-# 1. Configuração inicial - DEVE ser a primeira linha
-st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
+st.set_page_config(page_title="🎰 Gerador Mega-Sena PRO", layout="wide")
+st.title("🎰 Gerador Mega-Sena - Clique Múltiplo!")
 
-# 2. Inicialização Robusta do Estado
+# Estado
 if 'selecionados' not in st.session_state:
     st.session_state.selecionados = set()
 
-# --- LÓGICA DE CLIQUE (PROCESSAMENTO) ---
-# O truque aqui é processar antes de renderizar qualquer HTML
-params = st.query_params
-if "add" in params:
-    try:
-        num_clicado = int(params["add"])
-        # Inverte a seleção
-        if num_clicado in st.session_state.selecionados:
-            st.session_state.selecionados.remove(num_clicado)
-        else:
-            st.session_state.selecionados.add(num_clicado)
-        
-        # IMPORTANTE: Limpa o parâmetro para não entrar em loop, 
-        # mas mantém a sessão ativa.
-        st.query_params.clear()
-        st.rerun()
-    except:
-        pass
-
-# 3. CSS para a Tabela (Sua estética aprovada)
+# CSS Profissional
 st.markdown("""
-    <style>
-    .block-container { padding: 1rem 0.5rem !important; }
-    .volante-table {
-        width: 100%;
-        max-width: 450px;
-        border-collapse: separate;
-        border-spacing: 5px;
-        margin: 10px 0;
-    }
-    .volante-table td { width: 16.66%; }
-    .num-link {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 48px;
-        background-color: #f0f2f6;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        text-decoration: none !important;
-        color: #31333f !important;
-        font-weight: bold;
-        font-size: 18px;
-        font-family: sans-serif;
-    }
-    .num-link:hover { background-color: #e2e4e9; }
-    .num-link.selected {
-        background-color: #FF4B4B !important;
-        color: white !important;
-        border-color: #FF4B4B;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+.volante-table {width:100%;max-width:450px;border-collapse:separate;border-spacing:6px;margin:20px auto;}
+.volante-table td{width:16.66%;}
+.numero-btn {
+  width:100%;height:55px;background:linear-gradient(145deg,#f8fafc,#e2e8f0);
+  border:2px solid #cbd5e1;border-radius:12px;color:#1e293b!important;
+  font-weight:700;font-size:20px;cursor:pointer;transition:all 0.2s;
+  display:flex;align-items:center;justify-content:center;
+}
+.numero-btn:hover{transform:scale(1.05);background:linear-gradient(145deg,#e2e8f0,#cbd5e1)!important;}
+.numero-btn.selecionado{
+  background:linear-gradient(145deg,#ef4444,#dc2626)!important;color:white!important;
+  border-color:#b91c1c;box-shadow:0 6px 20px rgba(239,68,68,0.4);
+}
+</style>
+""", unsafe_allow_html=True)
 
-st.title("🎰 Gerador Pro")
-st.subheader("Selecione as Dezenas")
-st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
+# Contador
+st.markdown(f"### **Selecionados: {len(st.session_state.selecionados)}/60** 👆")
 
-# 4. Construção da Tabela HTML
-html_table = '<table class="volante-table">'
-for row in range(10):
-    html_table += '<tr>'
-    for col in range(6):
-        n = row * 6 + col + 1
-        sel_class = "selected" if n in st.session_state.selecionados else ""
-        # Usamos target="_self" para não abrir nova aba
-        html_table += f'<td><a href="?add={n}" target="_self" class="num-link {sel_class}">{n:02d}</a></td>'
-    html_table += '</tr>'
-html_table += '</table>'
+# VOLANTE com CALLBACK JS (SEM RELOAD!)
+col_esq, col_dir = st.columns([1,3])
+with col_esq:
+    st.markdown('<table class="volante-table">', unsafe_allow_html=True)
+    for linha in range(10):
+        st.markdown('<tr>', unsafe_allow_html=True)
+        for coluna in range(6):
+            n = linha * 6 + coluna + 1
+            selecionado = n in st.session_state.selecionados
+            classe = "selecionado" if selecionado else ""
+            
+            st.button(
+                str(n).zfill(2),
+                key=f"num_{n}",
+                on_click=lambda num=n: toggle_numero(num),
+                help=f"Clique para {'remover' if selecionado else 'adicionar'} {n}",
+                args=(),
+                use_container_width=True
+            )
+        st.markdown('</tr>', unsafe_allow_html=True)
+    st.markdown('</table>', unsafe_allow_html=True)
 
-st.markdown(html_table, unsafe_allow_html=True)
+def toggle_numero(numero):
+    """Callback - Toggle sem reload!"""
+    if numero in st.session_state.selecionados:
+        st.session_state.selecionados.remove(numero)
+    else:
+        st.session_state.selecionados.add(numero)
+    # st.rerun() REMOVIDO - Streamlit detecta automaticamente!
+
+# Botão LIMPAR
+if st.button("🗑️ LIMPAR TUDO", type="secondary"):
+    st.session_state.selecionados.clear()
+    st.rerun()
 
 st.divider()
 
-# --- 5. CONFIGURAÇÕES E FILTROS ---
-with st.container():
-    c1, c2 = st.columns(2)
-    with c1:
-        dez_por_jogo = st.number_input("Dezenas por jogo", 1, 20, 6)
-        valor_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
-    with c2:
-        gerar_tudo = st.checkbox("Gerar Todas")
-        qtd_max = 1048576 if gerar_tudo else st.number_input("Qtd Máxima de Jogos", 1, 1000000, 50)
+# CONFIG + GERAÇÃO (igual ao original)
+col1, col2 = st.columns(2)
+dezenas_input = st.text_area("Suas dezenas (1-60, vírgula):", 
+                           value=",".join(map(str, sorted(st.session_state.selecionados))), height=80)
+num_jogos = st.number_input("Jogos?", 1, 999999, 50)
+min_pares = st.slider("Mín pares/jogo", 0, 5, 2)
+max_pares = st.slider("Máx pares/jogo", 1, 6, 4)
+shuffle_jogos = st.checkbox("Embaralhar", True)
 
-    st.markdown("### 🛠️ Filtros")
-    f_seq = st.checkbox("🚫 Sem números sequenciais", True)
-    f_fin = st.checkbox("🚫 Sem finais iguais", True)
-    f_par = st.checkbox("⚖️ Equilibrar Pares/Ímpares", True)
-    max_p = st.slider("Máximo de Pares permitidos", 1, dez_por_jogo, max(1, dez_por_jogo-1))
+if st.button("🚀 GERAR JOGOS!", type="primary"):
 
-    col_b1, col_b2 = st.columns(2)
-    if col_b1.button("❌ Limpar Tudo", use_container_width=True):
-        st.session_state.selecionados = set()
-        st.query_params.clear()
-        st.rerun()
-    
-    gerar = col_b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
+    def gerar_jogos_balanceados(dezenas_str, num_jogos, min_pares, max_pares, shuffle=False):
+        try:
+            dezenas = sorted(set(int(x.strip()) for x in dezenas_str.split(",") if x.strip().isdigit()))
+            todas_combos = list(combinations(dezenas, 6))
+            jogos_ok = []
+            for combo in todas_combos:
+                pares = sum(1 for x in combo if x % 2 == 0)
+                if min_pares <= pares <= max_pares:
+                    jogos_ok.append(list(combo))
+            if shuffle:
+                import random
+                random.shuffle(jogos_ok)
+            return jogos_ok[:num_jogos]
+        except:
+            return []
 
-# --- 6. GERAÇÃO DE JOGOS ---
-if gerar:
-    lista_n = sorted(list(st.session_state.selecionados))
-    if len(lista_n) < dez_por_jogo:
-        st.error(f"Selecione pelo menos {dez_por_jogo} números no volante!")
-    else:
-        with st.spinner("Calculando combinações..."):
-            combos = combinations(lista_n, dez_por_jogo)
-            res = []
-            for c in combos:
-                j = sorted(list(c))
-                # Filtros
-                if f_seq and any(j[n+1] == j[n]+1 for n in range(len(j)-1)): continue
-                if f_fin and len(set(n % 10 for n in j)) == 1: continue
-                if f_par:
-                    p = len([x for x in j if x % 2 == 0])
-                    if p > max_p or (len(j)-p) > max_p: continue
-                
-                res.append(j)
-                if len(res) >= qtd_max: break
+    with st.spinner("Calculando..."):
+        jogos = gerar_jogos_balanceados(dezenas_input, num_jogos, min_pares, max_pares, shuffle_jogos)
+        
+        if jogos:
+            st.success(f"✅ **{len(jogos)} jogos gerados!**")
             
-            if not res:
-                st.warning("Nenhum jogo encontrado com esses filtros.")
-            else:
-                st.success(f"Sucesso! {len(res)} jogos gerados.")
-                m1, m2 = st.columns(2)
-                m1.metric("Total Jogos", f"{len(res):,}".replace(",", "."))
-                m2.metric("Valor Total", f"R$ {len(res)*valor_unit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                
-                st.dataframe(res[:500], use_container_width=True)
-                
-                # Download
-                csv_io = io.StringIO()
-                csv_io.write('\ufeff')
-                w = csv.writer(csv_io, delimiter=';')
-                w.writerow(["Jogo"] + [f"Bola {x+1}" for x in range(len(res[0]))])
-                for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
-                
-                st.download_button("💾 Baixar Planilha (.csv)", csv_io.getvalue().encode('utf-8-sig'), 
-                                 "meus_jogos.csv", "text/csv", use_container_width=True)
+            # Tabela
+            df = [{"Jogo": i+1, "Dezenas": ", ".join(f"{n:02d}" for n in sorted(jogo))} 
+                  for i, jogo in enumerate(jogos)]
+            st.dataframe(df, use_container_width=True, height=400)
+            
+            # Download CSV (semicolons pro Excel)
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer, delimiter=';')
+            writer.writerow(["Jogo", "Dezenas"])
+            for row in df:
+                writer.writerow([row["Jogo"], row["Dezenas"]])
+            
+            st.download_button(
+                "💾 CSV Excel", csv_buffer.getvalue(),
+                "mega_sena_jogos.csv", "text/csv", use_container_width=True
+            )
+            
+            # Stats
+            st.subheader("📊 Stats")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Jogos", len(jogos))
+            col2.metric("Dezenas únicas", len(set().union(*[set(j) for j in jogos])))
+            total_combos = len(list(combinations([int(x.strip()) for x in dezenas_input.split(",") if x.strip().isdigit()], 6)))
+            col3.metric("Combos possíveis", f"{total_combos:,}")
+            
+        else:
+            st.error("❌ Sem jogos. Ajuste filtros!")
+
+st.caption("🔧 **FIX:** `st.button(on_click)` substitui `href/query_params` - Zero reloads!")

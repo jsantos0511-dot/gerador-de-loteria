@@ -5,38 +5,44 @@ import io
 
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# 1. CSS "BRUTO" - Força a grade e anula o empilhamento automático do Streamlit
+# 1. CSS "ULTIMATUM" - Força 5 colunas e ignora as travas do Streamlit
 st.markdown("""
     <style>
-    /* Reset de margens mobile */
+    /* Ajuste de margens do app */
     .block-container { padding: 1rem 0.5rem !important; }
 
-    /* Alvo: O container que segura os botões */
-    /* Usamos um seletor de atributo para pegar apenas o container do volante */
-    div[data-testid="stVerticalBlock"] > div.element-container:has(#volante-marcador) + div {
+    /* Alvo: O container de colunas do Streamlit */
+    /* Forçamos a grade de 5 colunas independente do tamanho da tela */
+    [data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: repeat(6, 1fr) !important;
-        gap: 5px !important;
+        grid-template-columns: repeat(5, 1fr) !important; /* TESTE COM 5 COLUNAS */
+        gap: 6px !important;
     }
 
-    /* FORÇA cada coluna a manter 1/6 da largura, proibindo o empilhamento */
-    div[data-testid="column"] {
-        flex: 1 1 0% !important;
-        min-width: 0 !important;
+    /* Impede cada coluna de virar 'bloco' (empilhar) */
+    [data-testid="column"] {
         width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 !important;
     }
 
-    /* Estilo dos botões */
-    button {
-        height: 45px !important;
-        padding: 0px !important;
+    /* Estilo dos botões do volante */
+    .stButton button {
+        height: 50px !important;
+        width: 100% !important;
         font-weight: bold !important;
+        font-size: 16px !important;
+        padding: 0px !important;
     }
 
-    /* Estilo para as métricas e configurações (ZONA PROTEGIDA) */
-    .config-area div[data-testid="column"] {
-        flex: 1 1 50% !important; /* Mantém 2 colunas nas configurações */
-        min-width: 120px !important;
+    /* ZONA PROTEGIDA: Faz o restante do app ignorar a grade de 5 */
+    .config-area [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        grid-template-columns: none !important;
+    }
+    
+    .config-area [data-testid="column"] {
+        flex: 1 1 50% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -48,19 +54,15 @@ if 'jogos_gerados' not in st.session_state:
 
 st.title("🎰 Gerador Pro")
 
-# --- VOLANTE ---
+# --- VOLANTE (Agora com lógica de 5 colunas) ---
 st.subheader("Selecione as Dezenas")
 st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
 
-# Marcador invisível para o CSS localizar onde começa o volante
-st.markdown('<div id="volante-marcador"></div>', unsafe_allow_html=True)
-
-# Criamos as linhas. Para garantir que o Streamlit não tente ser "esperto",
-# vamos manter a estrutura de colunas, mas o CSS acima vai travar o layout.
-for r in range(10):
-    cols = st.columns(6)
-    for c in range(6):
-        num = r * 6 + c + 1
+# Renderizamos 12 linhas de 5 colunas (12 * 5 = 60)
+for r in range(12):
+    cols = st.columns(5)
+    for c in range(5):
+        num = r * 5 + c + 1
         is_sel = num in st.session_state.selecionados
         if cols[c].button(f"{num:02d}", key=f"v_{num}", type="primary" if is_sel else "secondary"):
             if is_sel: st.session_state.selecionados.remove(num)
@@ -69,12 +71,12 @@ for r in range(10):
 
 st.divider()
 
-# --- CONFIGURAÇÕES (ZONA PROTEGIDA PELO CSS) ---
+# --- CONFIGURAÇÕES (Limpas e sem grade de 5) ---
 st.markdown('<div class="config-area">', unsafe_allow_html=True)
 
 c1, c2 = st.columns(2)
 with c1:
-    dez_por_jogo = st.number_input("Dezenas por jogo", 1, 20, 6)
+    dez_per_jogo = st.number_input("Dezenas por jogo", 1, 20, 6)
     valor_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
 with c2:
     gerar_tudo = st.checkbox("Gerar Todas")
@@ -84,10 +86,10 @@ st.markdown("### Filtros")
 f_seq = st.checkbox("🚫 Sem Sequências", True)
 f_fin = st.checkbox("🚫 Sem Finais Iguais", True)
 f_par = st.checkbox("⚖️ Equilibrar Par/Ímpar", True)
-max_p = st.slider("Máximo de Pares", 1, dez_por_jogo, max(1, dez_por_jogo-1))
+max_p = st.slider("Máximo de Pares", 1, dez_per_jogo, max(1, dez_per_jogo-1))
 
 b1, b2 = st.columns(2)
-if b1.button("❌ Limpar", use_container_width=True):
+if b1.button("❌ Limpar Seleção", use_container_width=True):
     st.session_state.selecionados = set()
     st.session_state.jogos_gerados = None
     st.rerun()
@@ -96,11 +98,11 @@ gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
 
 if gerar:
     lista_n = sorted(list(st.session_state.selecionados))
-    if len(lista_n) < dez_por_jogo:
-        st.error(f"Selecione ao menos {dez_por_jogo} números!")
+    if len(lista_n) < dez_per_jogo:
+        st.error(f"Selecione ao menos {dez_per_jogo} números!")
     else:
         with st.spinner("Gerando..."):
-            combos = combinations(lista_n, dez_por_jogo)
+            combos = combinations(lista_n, dez_per_jogo)
             res = []
             for c in combos:
                 j = sorted(list(c))
@@ -117,8 +119,8 @@ if st.session_state.jogos_gerados:
     res, custo = st.session_state.jogos_gerados
     st.divider()
     m1, m2 = st.columns(2)
-    m1.metric("Jogos", f"{len(res):,}".replace(",", "."))
-    m2.metric("Total", f"R$ {custo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    m1.metric("Total Jogos", f"{len(res):,}".replace(",", "."))
+    m2.metric("Valor Total", f"R$ {custo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     st.dataframe(res[:500], use_container_width=True)
     
     csv_io = io.StringIO()

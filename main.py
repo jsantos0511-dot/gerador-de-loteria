@@ -3,82 +3,78 @@ import csv
 from itertools import combinations
 import io
 
+# 1. Configuração da Página
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# --- ESTADO DA SESSÃO ---
+# 2. Inicialização do Estado (Apenas se não existir)
 if 'selecionados' not in st.session_state:
     st.session_state.selecionados = set()
 if 'jogos_gerados' not in st.session_state:
     st.session_state.jogos_gerados = None
 
-# --- LÓGICA DE CLIQUE VIA URL (SEM REFRESH VISÍVEL) ---
-params = st.query_params
-if "num" in params:
-    n = int(params["num"])
-    if n in st.session_state.selecionados:
-        st.session_state.selecionados.remove(n)
-    else:
-        st.session_state.selecionados.add(n)
-    st.query_params.clear()
-    st.rerun()
-
-st.title("🎰 Gerador Pro Mobile")
-
-# --- CSS PARA FORÇAR 6 COLUNAS (BLINDADO) ---
+# 3. CSS para forçar a grade de 6 colunas no iPhone
 st.markdown("""
     <style>
-    /* Grade de 6 colunas fixa para o volante */
-    .volante-wrapper {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 6px;
-        width: 100%;
-        max-width: 450px;
-        margin: 10px 0;
+    /* Força o container do Streamlit a ser uma grade real */
+    div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: repeat(6, 1fr) !important;
+        gap: 5px !important;
     }
-    /* Estilo dos números (Links com cara de Botão) */
-    .btn-num {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 45px;
-        background-color: #f0f2f6;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        text-decoration: none !important;
-        color: #31333f !important;
-        font-weight: bold;
-        font-size: 16px;
+    /* Impede o empilhamento em 60 linhas */
+    div[data-testid="column"] {
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 !important;
     }
-    .btn-num:active { background-color: #e0e2e6; }
-    .btn-num.selected {
-        background-color: #ff4b4b !important;
-        color: white !important;
-        border-color: #ff4b4b;
+    /* Estilo dos botões do volante */
+    .stButton button {
+        width: 100% !important;
+        height: 45px !important;
+        font-weight: bold !important;
+        padding: 0 !important;
+        font-size: 16px !important;
     }
-    /* Proteção para os campos de baixo não ficarem em 6 colunas */
+    /* Proteção para os campos de baixo NÃO ficarem em 6 colunas */
     .config-section div[data-testid="stHorizontalBlock"] {
         display: flex !important;
+        grid-template-columns: none !important;
     }
+    /* Ajuste de margens mobile */
+    .block-container { padding: 1rem 0.5rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- RENDERIZAÇÃO DO VOLANTE ---
+st.title("🎰 Gerador Pro Mobile")
+
+# --- VOLANTE ---
 st.subheader("Selecione as Dezenas")
 st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
 
-# Construção do HTML do Volante
-volante_html = '<div class="volante-wrapper">'
-for i in range(1, 61):
-    css_class = "btn-num selected" if i in st.session_state.selecionados else "btn-num"
-    volante_html += f'<a href="?num={i}" target="_self" class="{css_class}">{i:02d}</a>'
-volante_html += '</div>'
-
-st.markdown(volante_html, unsafe_allow_html=True)
+# Renderização do Volante
+# Criamos 10 linhas de 6 colunas
+for r in range(10):
+    cols = st.columns(6)
+    for c in range(6):
+        num = r * 6 + c + 1
+        is_sel = num in st.session_state.selecionados
+        
+        # O segredo: callback direto para não perder o estado
+        if cols[c].button(
+            f"{num:02d}", 
+            key=f"btn_{num}", 
+            type="primary" if is_sel else "secondary",
+            use_container_width=True
+        ):
+            if num in st.session_state.selecionados:
+                st.session_state.selecionados.remove(num)
+            else:
+                st.session_state.selecionados.add(num)
+            st.rerun()
 
 st.divider()
 
-# --- ÁREA DE CONFIGURAÇÃO (PROTEGIDA) ---
+# --- CONFIGURAÇÕES (PROTEGIDAS PELO CSS) ---
 st.markdown('<div class="config-section">', unsafe_allow_html=True)
 c1, c2 = st.columns(2)
 with c1:
@@ -100,10 +96,14 @@ if b1.button("❌ Limpar Tudo", use_container_width=True):
     st.session_state.jogos_gerados = None
     st.rerun()
 
-if b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True):
+gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- PROCESSAMENTO ---
+if gerar:
     lista_n = sorted(list(st.session_state.selecionados))
     if len(lista_n) < dez_por_jogo:
-        st.error("Selecione mais números!")
+        st.error(f"Selecione ao menos {dez_por_jogo} números!")
     else:
         with st.spinner("Gerando..."):
             combos = combinations(lista_n, dez_por_jogo)
@@ -118,9 +118,8 @@ if b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True):
                 res.append(j)
                 if len(res) >= qtd_max: break
             st.session_state.jogos_gerados = (res, len(res) * valor_unit)
-st.markdown('</div>', unsafe_allow_html=True)
 
-# --- EXIBIÇÃO DOS RESULTADOS (PERSISTENTE AO ROLAR) ---
+# --- EXIBIÇÃO ---
 if st.session_state.jogos_gerados:
     res, custo = st.session_state.jogos_gerados
     st.divider()
@@ -136,4 +135,5 @@ if st.session_state.jogos_gerados:
     w.writerow(["Jogo"] + [f"B{x+1}" for x in range(len(res[0]))])
     for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
     
-    st.download_button("💾 Baixar Planilha", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)
+    st.download_button("💾 Baixar Planilha", csv_io.getvalue().encode('utf-8-sig'), 
+                     "jogos.csv", "text/csv", use_container_width=True)

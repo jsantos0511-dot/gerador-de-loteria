@@ -29,10 +29,10 @@ st.markdown("""
     /* Estilo dos botões */
     .stButton > button {
         width: 100% !important;
-        height: 44px !important;
+        height: 60px !important;
         padding: 0 !important;
         font-weight: bold !important;
-        font-size: 16px !important;
+        font-size: 12px !important;
     }
 
     /* Garante que os campos de baixo NÃO herdem a grade de 6 */

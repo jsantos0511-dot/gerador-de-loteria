@@ -7,12 +7,11 @@ import random
 # 1. Configuração da Página
 st.set_page_config(page_title="Loteria Mobile", layout="centered")
 
-# 2. Inicialização do Estado
+# 2. Inicialização do Estado de Memória
 if 'selecionados' not in st.session_state:
     st.session_state.selecionados = set()
 
-# --- LÓGICA DE CAPTURA DE CLIQUE ---
-# Captura o número clicado via parâmetro na URL para evitar o empilhamento dos botões nativos
+# --- LÓGICA DE CAPTURA DE CLIQUE (URL) ---
 params = st.query_params
 if "n" in params:
     n_clicado = int(params["n"])
@@ -20,13 +19,12 @@ if "n" in params:
         st.session_state.selecionados.remove(n_clicado)
     else:
         st.session_state.selecionados.add(n_clicado)
-    st.query_params.clear() # Limpa a URL
+    st.query_params.clear() # Limpa o parâmetro da URL após ler
     st.rerun()
 
-# 3. CSS para o Volante Flexível (Chips)
+# 3. CSS para o Volante em Chips (Não empilha)
 st.markdown("""
     <style>
-    /* Container que agrupa os números sem empilhar */
     .volante-container {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -35,7 +33,6 @@ st.markdown("""
         padding: 10px 0 !important;
     }
     
-    /* Estilo dos botões (Chips) */
     .chip {
         display: inline-flex;
         align-items: center;
@@ -49,10 +46,7 @@ st.markdown("""
         color: #31333f !important;
         font-weight: bold;
         font-size: 16px;
-        transition: 0.2s;
     }
-    
-    .chip:active { transform: scale(0.9); }
     
     .chip.selected {
         background-color: #FF4B4B !important;
@@ -68,25 +62,26 @@ st.title("🎰 Gerador Pro Mobile")
 
 # --- VOLANTE ---
 st.subheader("Selecione as Dezenas")
-st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
+st.write(f"**Selecionados:** {len(st.session_state.selecionados)}")
 
 # Botões de Ações Rápidas
 c1, c2 = st.columns(2)
 with c1:
     if st.button("🎲 Surpresinha", use_container_width=True):
         st.session_state.selecionados = set(random.sample(range(1, 61), 6))
+        st.query_params.clear() # Limpa qualquer resquício da URL para não conflitar
         st.rerun()
 with c2:
     if st.button("❌ Limpar Tudo", use_container_width=True):
         st.session_state.selecionados = set()
+        st.query_params.clear()
         st.rerun()
 
 # --- RENDERIZAÇÃO DO VOLANTE HTML ---
-# Criamos os botões manualmente em HTML para o Streamlit não conseguir empilhá-los
 html_volante = '<div class="volante-container">'
 for i in range(1, 61):
     clase = "chip selected" if i in st.session_state.selecionados else "chip"
-    # O link redireciona para a própria página com o número no parâmetro ?n=
+    # Adicionamos target="_self" para garantir que ele não abra nova aba
     html_volante += f'<a href="?n={i}" target="_self" class="{clase}">{i:02d}</a>'
 html_volante += '</div>'
 

@@ -5,8 +5,8 @@ import io
 import random
 import pandas as pd
 
-# 1. Configuração da Página e Tema Escuro Forçado
-st.set_page_config(page_title="Portal Loterias Pro", layout="centered")
+# 1. Configuração da Página
+st.set_page_config(page_title="Portal Loterias", layout="centered")
 
 # --- DICIONÁRIO DE CONFIGURAÇÕES ---
 TEMAS = {
@@ -25,52 +25,26 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#00FF00"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS PARA FUNDO PRETO E CARDS COLORIDOS
-estilos_cards = ""
-for nome, dados in TEMAS.items():
-    estilos_cards += f"""
-    button[aria-label="🍀 {nome}"] {{
-        height: 120px !important;
-        background-color: #0e1117 !important; /* Fundo Preto Streamlit */
-        border: 2px solid {dados['cor']} !important;
-        color: {dados['cor']} !important;
-        border-radius: 15px !important;
-        font-weight: bold !important;
-        font-size: 22px !important;
-        box-shadow: 0 4px 15px {dados['cor']}40 !important;
-    }}
-    button[aria-label="🍀 {nome}"]:hover {{
-        background-color: {dados['cor']}20 !important;
-        border-color: #ffffff !important;
-        color: #ffffff !important;
-    }}
-    """
-
+# 2. CSS GLOBAL (DARK MODE)
 st.markdown(f"""
     <style>
-    /* Global Dark */
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
-    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
+    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 20px; }}
     
-    /* Segmented Control (Volante) */
+    /* Estilo do Volante */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
         gap: 4px !important;
     }}
-    button[role="option"] {{ background-color: #1d2129 !important; color: #eee !important; }}
-
-    /* Injeção dos Cards */
-    {estilos_cards}
-
-    /* Outros botões */
-    .stButton > button {{ border-radius: 8px !important; }}
+    
+    /* Esconder Sidebar */
     [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- LÓGICA DE FILTRO ---
+# --- FUNÇÃO DE FILTRO ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -93,10 +67,27 @@ def home():
     st.write("---")
     
     col1, col2 = st.columns(2)
+    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            if st.button(f"🍀 {nome}", use_container_width=True):
+            # CARD VISUAL (HTML)
+            st.markdown(f"""
+                <div style="
+                    border: 2px solid {dados['cor']}; 
+                    border-radius: 15px; 
+                    padding: 15px; 
+                    text-align: center; 
+                    background-color: #0e1117;
+                    margin-bottom: 10px;
+                ">
+                    <span style="font-size: 30px;">🍀</span><br>
+                    <span style="color: {dados['cor']}; font-weight: bold; font-size: 20px; font-family: sans-serif;">{nome}</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # BOTÃO DE NAVEGAÇÃO (ESTILIZADO)
+            if st.button(f"Selecionar {nome}", key=f"btn_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 
@@ -110,58 +101,64 @@ def gerador_loteria(nome, config):
     key_sel = f"sel_{nome}"
     if key_sel not in st.session_state: st.session_state[key_sel] = []
     
+    # Comandos Rápidos
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🎲 Surpresinha", use_container_width=True):
             st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar", use_container_width=True):
+        if st.button("❌ Limpar Seleção", use_container_width=True):
             st.session_state[key_sel] = []
             st.rerun()
 
+    # Volante
     opcoes = [f"{i:02d}" for i in range(1, config['total'] + 1)]
     selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=key_sel, label_visibility="collapsed")
     
-    st.info(f"Selecionados: {len(selecionados)} números")
+    st.info(f"**{len(selecionados)}** números selecionados")
 
+    # Configurações do Jogo
     col_a, col_b = st.columns(2)
     with col_a:
-        dez_por_jogo = st.number_input("Bolas por jogo", config['min_sel'], config['total'], config['min_sel'])
-        valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
+        dez_por_jogo = st.number_input("Dezenas por jogo", config['min_sel'], config['total'], config['min_sel'])
+        valor_unit = st.number_input("Valor da aposta R$", 0.0, 5000.0, config['preco'])
     with col_b:
-        gerar_tudo = st.checkbox("Gerar TODAS")
-        qtd_max = st.number_input("Limite", 1, 1000000, 100, disabled=gerar_tudo)
+        gerar_tudo = st.checkbox("Gerar TODAS possíveis")
+        qtd_max = st.number_input("Limite de jogos", 1, 1000000, 100, disabled=gerar_tudo)
 
+    # Filtros
     with st.expander("🛠️ Filtros Inteligentes"):
-        f_s = st.checkbox("🚫 Sem sequências (ex: 01, 02)")
-        f_f = st.checkbox("🚫 Limitar finais iguais")
+        f_s = st.checkbox("🚫 Evitar Sequências")
+        f_f = st.checkbox("🚫 Evitar Finais Repetidos")
         f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
-        m_p = st.slider("Máx. Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
+        m_p = st.slider("Máximo de Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
-    if st.button(f"🚀 GERAR COMBINAÇÕES", type="primary", use_container_width=True):
+    # Botão de Ação
+    if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
-            st.error(f"Selecione ao menos {dez_por_jogo} números!")
+            st.error(f"Selecione pelo menos {dez_por_jogo} números no volante!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
-            with st.spinner("Processando..."):
+            with st.spinner("Calculando combinações..."):
                 combos = combinations(lista_n, dez_por_jogo)
                 res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
                 
                 if res:
-                    st.success(f"{len(res)} jogos gerados!")
-                    st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
-                    df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
+                    st.success(f"{len(res)} jogos gerados com sucesso!")
+                    st.metric("Investimento", f"R$ {len(res)*valor_unit:,.2f}")
+                    df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
                     st.dataframe(df, use_container_width=True)
                     
+                    # CSV Export
                     csv_io = io.StringIO()
                     csv_io.write('\ufeff')
                     w = csv.writer(csv_io, delimiter=';')
-                    w.writerow(["ID"] + [f"B{i+1}" for i in range(dez_por_jogo)])
+                    w.writerow(["Jogo"] + [f"D{i+1}" for i in range(dez_por_jogo)])
                     for idx, r in enumerate(res):
                         w.writerow([idx + 1] + [f"{n:02d}" for n in r])
-                    st.download_button("💾 Download CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", "text/csv", use_container_width=True)
+                    st.download_button("💾 Baixar Jogos (CSV)", csv_io.getvalue().encode('utf-8-sig'), f"jogos_{nome.lower()}.csv", "text/csv", use_container_width=True)
 
-# --- EXECUÇÃO ---
+# --- NAVEGAÇÃO ---
 if st.session_state.pagina == "Início":
     home()
 else:

@@ -5,93 +5,107 @@ import io
 import random
 import pandas as pd
 
-# --- CONFIGURAÇÕES GERAIS ---
+# 1. Configuração da Página
 st.set_page_config(page_title="Portal Loterias", layout="centered")
 
-# CSS Global para garantir o layout em todas as páginas
-st.markdown("""
+# --- DICIONÁRIO DE CORES TEMÁTICAS ---
+TEMAS = {
+    "Início": {"cor": "#31333F", "titulo": "Portal de Loterias"},
+    "Mega-Sena": {"cor": "#209869", "titulo": "Mega-Sena"},     # Verde Oficial
+    "Lotofácil": {"cor": "#930089", "titulo": "Lotofácil"},     # Roxo Oficial
+    "Quina": {"cor": "#260085", "titulo": "Quina"},             # Azul Oficial
+    "Lotomania": {"cor": "#f7941d", "titulo": "Lotomania"}      # Laranja Oficial
+}
+
+# --- MENU DE NAVEGAÇÃO ---
+menu = st.sidebar.radio("Escolha a Loteria:", list(TEMAS.keys()))
+tema_atual = TEMAS[menu]
+
+# 2. CSS DINÂMICO (Muda conforme a seleção)
+st.markdown(f"""
     <style>
-    h1 { font-size: 1.6rem !important; text-align: center; }
-    div[data-testid="stSegmentedControl"] {
+    /* Cor do Título Dinâmica */
+    .titulo-custom {{
+        color: {tema_atual['cor']};
+        font-size: 1.8rem;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }}
+
+    /* Estilo dos Botões do Volante (Cores Oficiais) */
+    button[role="option"][aria-selected="true"] {{
+        background-color: {tema_atual['cor']} !important;
+        color: white !important;
+    }}
+
+    /* Grade de 6 colunas para Mega e Quina, 5 para Lotofácil */
+    div[data-testid="stSegmentedControl"] {{
         display: grid !important;
-        grid-template-columns: repeat(6, 1fr) !important;
+        grid-template-columns: repeat({5 if menu == "Lotofácil" else 6 if menu == "Mega-Sena" else 8}, 1fr) !important;
         gap: 5px !important;
-        width: 100% !important;
-    }
-    div[data-testid="stSegmentedControl"] button {
+    }}
+
+    button[role="option"] {{
         min-width: 0px !important; width: 100% !important; height: 45px !important;
-        font-weight: bold !important; border-radius: 6px !important; font-size: 19px !important;
-    }
-    .block-container { padding: 1rem 0.5rem !important; }
+        font-weight: bold !important; border-radius: 6px !important; font-size: 18px !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE APOIO ---
-def gerar_mega(selecionados, dezenas, limite, f_seq, f_finais, f_par, max_p):
-    lista_n = sorted([int(x) for x in selecionados])
-    combos = combinations(lista_n, dezenas)
-    resultado = []
-    for c in combos:
-        jogo = list(c)
-        if f_seq and any(jogo[i+1] == jogo[i]+1 for i in range(len(jogo)-1)): continue
-        if f_finais:
-            finais = [n % 10 for n in jogo]
-            if any(finais.count(f) > 4 for f in finais): continue
-        if f_par:
-            p = len([n for n in jogo if n % 2 == 0])
-            if p > max_p or (dezenas - p) > max_p: continue
-        resultado.append(jogo)
-        if len(resultado) >= limite: break
-    return resultado
-
-# --- PÁGINAS ---
+# --- FUNÇÕES DE PÁGINA ---
 
 def home():
-    st.title("🍀 Gerador de Loterias Pro")
-    st.write("Selecione uma modalidade no menu lateral para começar.")
-    st.info("Este aplicativo utiliza filtros estatísticos para otimizar seus jogos.")
+    st.markdown(f'<div class="titulo-custom">{tema_atual["titulo"]}</div>', unsafe_allow_html=True)
+    st.info("Selecione uma modalidade ao lado para gerar seus jogos com filtros estatísticos.")
 
-def mega_sena():
-    st.title("🎰 Mega-Sena")
-    if 'mega_sel' not in st.session_state: st.session_state.mega_sel = []
+def gerador_loteria(nome_loteria, total_numeros):
+    st.markdown(f'<div class="titulo-custom">Gerador {nome_loteria}</div>', unsafe_allow_html=True)
     
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
+    key_sel = f"sel_{nome_loteria}"
+    if key_sel not in st.session_state: st.session_state[key_sel] = []
+    
+    c1, c2 = st.columns(2)
+    with c1:
         if st.button("🎲 Surpresinha", use_container_width=True):
-            st.session_state.mega_sel = [f"{i:02d}" for i in random.sample(range(1, 61), 6)]
-    with col_btn2:
+            st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, total_numeros + 1), 6)]
+    with c2:
         if st.button("❌ Limpar", use_container_width=True):
-            st.session_state.mega_sel = []
+            st.session_state[key_sel] = []
             st.rerun()
 
-    sel = st.segmented_control("Selecione:", options=[f"{i:02d}" for i in range(1, 61)], 
-                               selection_mode="multi", key="mega_sel", label_visibility="collapsed")
+    opcoes = [f"{i:02d}" for i in range(1, total_numeros + 1)]
+    selecionados = st.segmented_control("Volante", options=opcoes, selection_mode="multi", key=key_sel, label_visibility="collapsed")
     
-    st.write(f"**Selecionados:** {len(sel)}")
-    
-    with st.expander("🛠️ Filtros e Configurações"):
-        d_jogo = st.number_input("Bolas por jogo", 6, 20, 6)
-        v_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
-        l_jogos = st.number_input("Limite de Jogos", 1, 1000, 100)
-        f_s = st.checkbox("🚫 Evitar sequências")
-        f_f = st.checkbox("🚫 Evitar +4 finais iguais")
-        f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
-        m_p = st.slider("Máx Pares", 0, d_jogo, d_jogo//2) if f_p else d_jogo
+    st.write(f"**Selecionados:** {len(selecionados)}")
+    st.divider()
 
-    if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
-        if len(sel) < d_jogo: st.error(f"Selecione {d_jogo} números!")
+    # --- CONFIGS E GERAÇÃO ---
+    with st.expander("🛠️ Filtros Avançados"):
+        d_jogo = st.number_input("Dezenas por jogo", 6, 20, 6)
+        l_jogos = st.number_input("Limite de combinações", 1, 1000, 100)
+        f_s = st.checkbox("🚫 Sem sequências")
+
+    if st.button(f"🚀 GERAR JOGOS {nome_loteria.upper()}", type="primary", use_container_width=True):
+        if len(selecionados) < d_jogo:
+            st.error(f"Selecione no mínimo {d_jogo} números!")
         else:
-            res = gerar_mega(sel, d_jogo, l_jogos, f_s, f_f, f_p, m_p)
-            if res:
-                df = pd.DataFrame(res, columns=[f"Bola {i+1}" for i in range(d_jogo)])
-                df.index += 1
-                st.dataframe(df, use_container_width=True)
-                st.metric("Total", f"R$ {len(res)*v_unit:,.2f}")
-            else: st.warning("Nenhum jogo com esses filtros!")
+            # Lógica simples de geração (pode ser expandida com seus filtros anteriores)
+            lista_n = sorted([int(x) for x in selecionados])
+            res = [list(c) for c in combinations(lista_n, d_jogo)][:l_jogos]
+            
+            df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(d_jogo)])
+            df.index += 1
+            st.dataframe(df, use_container_width=True)
 
-# --- NAVEGAÇÃO ---
-menu = st.sidebar.radio("Escolha a Loteria:", ["Início", "Mega-Sena", "Lotofácil", "Quina"])
-
-if menu == "Início": home()
-elif menu == "Mega-Sena": mega_sena()
-else: st.sidebar.warning("Em desenvolvimento...")
+# --- ROTEAMENTO ---
+if menu == "Início":
+    home()
+elif menu == "Mega-Sena":
+    gerador_loteria("Mega-Sena", 60)
+elif menu == "Lotofácil":
+    gerador_loteria("Lotofácil", 25)
+elif menu == "Quina":
+    gerador_loteria("Quina", 80)
+else:
+    st.write("Em desenvolvimento...")

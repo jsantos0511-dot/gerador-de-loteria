@@ -8,27 +8,27 @@ import pandas as pd
 # 1. Configuração da Página
 st.set_page_config(page_title="Portal Loterias Pro", layout="centered")
 
-# --- DICIONÁRIO DE CONFIGURAÇÕES E ÍCONES (Links Estáveis) ---
+# --- DICIONÁRIO DE CONFIGURAÇÕES E ÍCONES (EMOJIS PARA GARANTIR VISUALIZAÇÃO) ---
 TEMAS = {
     "Mega-Sena": {
         "cor": "#209869", "total": 60, "cols": 6, "min_sel": 6, "preco": 5.0,
-        "logo": "https://img.itdg.com.br/tdg/assets/loterias/mega-sena.png"
+        "icone": "🟢", "desc": "Sorteios quartas e sábados"
     },
     "Lotofácil": {
         "cor": "#930089", "total": 25, "cols": 5, "min_sel": 15, "preco": 3.0,
-        "logo": "https://img.itdg.com.br/tdg/assets/loterias/lotofacil.png"
+        "icone": "🟣", "desc": "Fácil de jogar e ganhar"
     },
     "Quina": {
         "cor": "#260085", "total": 80, "cols": 8, "min_sel": 5, "preco": 3.5,
-        "logo": "https://img.itdg.com.br/tdg/assets/loterias/quina.png"
+        "icone": "🔵", "desc": "Concorra a prêmios diários"
     },
     "Lotomania": {
         "cor": "#f7941d", "total": 100, "cols": 10, "min_sel": 50, "preco": 3.0,
-        "logo": "https://img.itdg.com.br/tdg/assets/loterias/lotomania.png"
+        "icone": "🟠", "desc": "A mania de ganhar"
     },
     "Dupla Sena": {
         "cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "preco": 2.5,
-        "logo": "https://img.itdg.com.br/tdg/assets/loterias/dupla-sena.png"
+        "icone": "🔴", "desc": "Dobro de chances"
     }
 }
 
@@ -36,7 +36,6 @@ TEMAS = {
 if 'pagina' not in st.session_state:
     st.session_state.pagina = "Início"
 
-# Define o tema atual
 p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#31333F"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
@@ -44,22 +43,39 @@ cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 # 2. CSS DINÂMICO
 st.markdown(f"""
     <style>
-    .titulo-custom {{ color: {cor_tema}; font-size: 1.8rem; font-weight: bold; text-align: center; margin-bottom: 20px; }}
-    .stButton > button {{ border-radius: 8px !important; }}
-    /* Ajuste do Volante */
+    .titulo-custom {{ color: {cor_tema}; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 5px; }}
+    .subtitulo {{ text-align: center; color: #666; margin-bottom: 20px; }}
+    
+    /* Estilo dos Cards na Home */
+    .card-home {{
+        background-color: white;
+        border: 2px solid #f0f2f6;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        margin-bottom: 10px;
+    }}
+    .icone-grande {{ font-size: 40px; margin-bottom: 10px; }}
+    
+    /* Estilo do Volante */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
         gap: 4px !important;
     }}
-    button[role="option"] {{ min-width: 0px !important; width: 100% !important; height: 40px !important; font-size: 16px !important; font-weight: bold !important; padding:0 !important; }}
-    /* Esconder menu lateral nativo se quiser ou apenas limpar */
-    [data-testid="stSidebar"] {{ min-width: 0px !important; width: 0px !important; }}
+    button[role="option"] {{ 
+        min-width: 0px !important; width: 100% !important; height: 42px !important; 
+        font-size: 16px !important; font-weight: bold !important; padding: 0 !important; 
+    }}
+    
+    /* Esconder Sidebar */
+    [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE FILTRO ---
+# --- LÓGICA DE FILTRO ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -78,19 +94,22 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
 # --- PÁGINAS ---
 
 def home():
-    st.markdown('<div class="titulo-custom">🍀 Portal de Loterias Pro</div>', unsafe_allow_html=True)
+    st.markdown('<div class="titulo-custom">🍀 Portal Loterias Pro</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitulo">Gerador de combinações inteligentes</div>', unsafe_allow_html=True)
     st.write("---")
     
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # Container do Card
-            st.markdown(f"""<div style='text-align: center; padding: 10px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 5px;'>
-                <img src='{dados['logo']}' width='65' style='margin-bottom: 5px;'><br>
-                <b style='color:{dados['cor']}; font-size: 18px;'>{nome}</b>
-            </div>""", unsafe_allow_html=True)
-            if st.button(f"Selecionar {nome}", key=f"btn_{nome}", use_container_width=True):
+            st.markdown(f"""
+                <div class="card-home">
+                    <div class="icone-grande">{dados['icone']}</div>
+                    <div style="color:{dados['cor']}; font-weight:bold; font-size:18px;">{nome}</div>
+                    <div style="font-size:12px; color:#888;">{dados['desc']}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"Abrir {nome}", key=f"btn_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
             st.write("")
@@ -100,7 +119,7 @@ def gerador_loteria(nome, config):
         st.session_state.pagina = "Início"
         st.rerun()
 
-    st.markdown(f'<div class="titulo-custom">Gerador {nome}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="titulo-custom">{config["icone"]} Gerador {nome}</div>', unsafe_allow_html=True)
     
     key_sel = f"sel_{nome}"
     if key_sel not in st.session_state: st.session_state[key_sel] = []
@@ -110,7 +129,7 @@ def gerador_loteria(nome, config):
         if st.button("🎲 Surpresinha", use_container_width=True):
             st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar", use_container_width=True):
+        if st.button("❌ Limpar Seleção", use_container_width=True):
             st.session_state[key_sel] = []
             st.rerun()
 

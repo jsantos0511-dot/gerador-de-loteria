@@ -13,8 +13,8 @@ st.markdown("""
     .volante-grid div[data-testid="stHorizontalBlock"] {
         display: grid !important;
         grid-template-columns: repeat(6, 1fr) !important;
-        gap: 6px !important;
-        width: 100% !important;
+        gap: 3px !important;
+        width: 50% !important;
     }
 
     .volante-grid div[data-testid="column"] {

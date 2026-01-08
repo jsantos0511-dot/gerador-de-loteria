@@ -5,30 +5,30 @@ import io
 
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# Inicialização do Estado
-if 'selecionados' not in st.session_state:
-    st.session_state.selecionados = []
+# --- LÓGICA DE PERSISTÊNCIA NA URL ---
+# Lemos os números que já estão na URL
+params = st.query_params
+selecionados_na_url = params.get_all("n") # Pega todos os valores de 'n'
+selecionados = [int(x) for x in selecionados_na_url]
 
-# --- LÓGICA DE RECEBER DADOS DO HTML ---
-# Captura o clique vindo do Javascript
-query_params = st.query_params
-if "clique" in query_params:
-    num_clicado = int(query_params["clique"])
-    if num_clicado in st.session_state.selecionados:
-        st.session_state.selecionados.remove(num_clicado)
+# Se houver um novo clique
+if "clique" in params:
+    num_clicado = int(params.get("clique"))
+    if num_clicado in selecionados:
+        selecionados.remove(num_clicado)
     else:
-        st.session_state.selecionados.append(num_clicado)
-    # Limpa a URL para evitar loops
-    st.query_params.clear()
+        selecionados.append(num_clicado)
+    
+    # Atualiza a URL com a nova lista e recarrega
+    st.query_params.from_dict({"n": selecionados})
     st.rerun()
 
-# --- CSS E ESTRUTURA DO VOLANTE ---
 st.title("🎰 Gerador Pro")
 
+# --- VISUAL DO VOLANTE (HTML PURO) ---
 st.subheader("Selecione as Dezenas")
-st.write(f"**Selecionados:** {len(st.session_state.selecionados)}/60")
+st.write(f"**Selecionados:** {len(selecionados)}/60")
 
-# Montando o volante em HTML Puro para o Safari não quebrar
 html_volante = """
 <style>
     .grid-container {
@@ -63,20 +63,23 @@ html_volante = """
 <div class="grid-container">
 """
 
+# Criamos os links mantendo os números já selecionados na URL
+base_url = "?"
+for s in selecionados:
+    base_url += f"n={s}&"
+
 for i in range(1, 61):
-    clase = "num-btn active" if i in st.session_state.selecionados else "num-btn"
-    # O link recarrega a página passando o número clicado
-    html_volante += f'<a href="?clique={i}" target="_self" class="{clase}">{i:02d}</a>'
+    clase = "num-btn active" if i in selecionados else "num-btn"
+    # Cada botão envia o seu número para o parâmetro 'clique'
+    url_botao = f"{base_url}clique={i}"
+    html_volante += f'<a href="{url_botao}" target="_self" class="{clase}">{i:02d}</a>'
 
 html_volante += "</div>"
-
-# Injeta o volante na tela
 st.markdown(html_volante, unsafe_allow_html=True)
 
 st.divider()
 
-# --- ÁREA DE CONFIGURAÇÕES (COMPONENTES NATIVOS) ---
-# Aqui usamos os botões nativos para o restante, que já estão funcionando bem
+# --- CONFIGURAÇÕES ---
 c1, c2 = st.columns(2)
 with c1:
     dez_por_jogo = st.number_input("Dezenas/jogo", 1, 20, 6)
@@ -92,16 +95,16 @@ f_par = st.checkbox("⚖️ Equilibrar Par/Ímpar", True)
 max_p = st.slider("Máx. Pares", 1, dez_por_jogo, max(1, dez_por_jogo-1))
 
 b1, b2 = st.columns(2)
-if b1.button("❌ Limpar", use_container_width=True):
-    st.session_state.selecionados = []
+if b1.button("❌ Limpar Tudo", use_container_width=True):
+    st.query_params.clear()
     st.rerun()
 
 gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
 
-# --- RESULTADOS ---
+# --- PROCESSAMENTO ---
 if gerar:
     st.divider()
-    lista_n = sorted(st.session_state.selecionados)
+    lista_n = sorted(selecionados)
     if len(lista_n) < dez_por_jogo:
         st.error(f"Selecione ao menos {dez_por_jogo} números!")
     else:
@@ -129,4 +132,4 @@ if gerar:
             w = csv.writer(csv_io, delimiter=';')
             w.writerow(["Jogo"] + [f"B{x+1}" for x in range(dez_por_jogo)])
             for idx, r in enumerate(res): w.writerow([idx+1] + [f"{n:02d}" for n in r])
-            st.download_button("💾 Baixar Excel", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)
+            st.download_button("💾 Baixar Planilha", csv_io.getvalue().encode('utf-8-sig'), "jogos.csv", "text/csv", use_container_width=True)

@@ -21,14 +21,14 @@ st.markdown("""
     
     /* Impede o empilhamento das colunas individuais */
     [data-testid="stHorizontalBlock"].volante-container [data-testid="column"] {
-        width: 100% !important;
+        width: 20% !important;
         flex: 1 !important;
         min-width: 0 !important;
     }
 
     /* Estilo dos botões */
     .stButton > button {
-        width: 100% !important;
+        width: 20% !important;
         height: 60px !important;
         padding: 0 !important;
         font-weight: bold !important;

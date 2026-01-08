@@ -56,7 +56,7 @@ st.subheader("Escolha seus números")
 qtd = len(st.session_state.selecionados)
 st.write(f"**Selecionados:** {qtd}/60")
 
-# Container que força as 6 colunas
+# Container que força as 10 colunas
 st.markdown('<div class="volante-grid">', unsafe_allow_html=True)
 for linha in range(6): 
     cols = st.columns(10)

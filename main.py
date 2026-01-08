@@ -26,7 +26,6 @@ st.markdown("""
     /* Botão solicitado: Altura otimizada e fonte 15px */
     .volante-grid button {
         height: 35px !important;
-        width: 40px !important;
         font-size: 15px !important;
         font-weight: bold !important;
         padding: 0 !important;
@@ -59,10 +58,10 @@ st.write(f"**Selecionados:** {qtd}/60")
 
 # Container que força as 6 colunas
 st.markdown('<div class="volante-grid">', unsafe_allow_html=True)
-for linha in range(10): 
-    cols = st.columns(6)
-    for coluna in range(6):
-        numero = linha * 6 + coluna + 1
+for linha in range(6): 
+    cols = st.columns(10)
+    for coluna in range(10):
+        numero = linha * 10 + coluna + 1
         is_sel = numero in st.session_state.selecionados
         if cols[coluna].button(
             f"{numero:02d}", 

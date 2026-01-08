@@ -10,26 +10,11 @@ st.set_page_config(page_title="Portal Loterias Pro", layout="centered")
 
 # --- DICIONÁRIO DE CONFIGURAÇÕES ---
 TEMAS = {
-    "Mega-Sena": {
-        "cor": "#209869", "total": 60, "cols": 6, "min_sel": 6, "preco": 5.0,
-        "icone": "🟢"
-    },
-    "Lotofácil": {
-        "cor": "#930089", "total": 25, "cols": 5, "min_sel": 15, "preco": 3.0,
-        "icone": "🟣"
-    },
-    "Quina": {
-        "cor": "#260085", "total": 80, "cols": 8, "min_sel": 5, "preco": 3.5,
-        "icone": "🔵"
-    },
-    "Lotomania": {
-        "cor": "#f7941d", "total": 100, "cols": 10, "min_sel": 50, "preco": 3.0,
-        "icone": "🟠"
-    },
-    "Dupla Sena": {
-        "cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "preco": 2.5,
-        "icone": "🔴"
-    }
+    "Mega-Sena": {"cor": "#209869", "total": 60, "cols": 6, "min_sel": 6, "preco": 5.0, "icone": "🟢"},
+    "Lotofácil": {"cor": "#930089", "total": 25, "cols": 5, "min_sel": 15, "preco": 3.0, "icone": "🟣"},
+    "Quina": {"cor": "#260085", "total": 80, "cols": 8, "min_sel": 5, "preco": 3.5, "icone": "🔵"},
+    "Lotomania": {"cor": "#f7941d", "total": 100, "cols": 10, "min_sel": 50, "preco": 3.0, "icone": "🟠"},
+    "Dupla Sena": {"cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "preco": 2.5, "icone": "🔴"}
 }
 
 # --- CONTROLE DE NAVEGAÇÃO ---
@@ -40,31 +25,35 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#31333F"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS DINÂMICO PARA BOTÕES DE CARD
+# 2. CSS DINÂMICO (CORREÇÃO DE ESCOPO)
 st.markdown(f"""
     <style>
     .titulo-custom {{ color: {cor_tema}; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
     
-    /* ESTILO DO VOLANTE */
+    /* Estilo do Volante (Segmented Control) */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
         gap: 4px !important;
     }}
-    button[role="option"] {{ min-width: 0px !important; width: 100% !important; height: 42px !important; font-weight: bold !important; padding: 0 !important; }}
-    
-    /* AJUSTE PARA O BOTÃO PARECER UM CARD */
-    div.stButton > button {{
+    button[role="option"] {{ min-width: 0px !important; width: 100% !important; height: 42px !important; font-weight: bold !important; }}
+
+    /* CSS APENAS PARA OS CARDS DA HOME (usando seletor de dados específico) */
+    div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"] > div > div > div[data-testid="stButton"] > button[key^="card_"] {{
         height: 120px !important;
-        border-radius: 15px !important;
-        border: 2px solid #f0f2f6 !important;
-        transition: 0.3s !important;
         background-color: white !important;
+        border: 2px solid #f0f2f6 !important;
+        border-radius: 15px !important;
+        font-size: 1.2rem !important;
+        font-weight: bold !important;
+        color: #333 !important;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.05) !important;
     }}
-    div.stButton > button:hover {{
-        border-color: #ccc !important;
-        background-color: #fafafa !important;
+
+    /* Estilo padrão para os demais botões (Limpar, Gerar, Voltar) */
+    .stButton > button {{
+        border-radius: 8px !important;
     }}
     
     [data-testid="stSidebar"] {{ display: none; }}
@@ -91,21 +80,18 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
 
 def home():
     st.markdown('<div class="titulo-custom">🎰 Portal Loterias</div>', unsafe_allow_html=True)
-    
-    # Grid de 2 colunas para os "Botões Card"
     col1, col2 = st.columns(2)
-    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # O botão agora contém o ícone e o nome, agindo como o card
-            label = f"{dados['icone']}\n\n{nome}"
-            if st.button(label, key=f"card_{nome}", use_container_width=True):
+            # Identificamos este botão com o prefixo "card_" para o CSS
+            if st.button(f"{dados['icone']}\n\n{nome}", key=f"card_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 
 def gerador_loteria(nome, config):
-    if st.button("⬅️ Voltar ao Menu", use_container_width=True):
+    # Botão de voltar simples e limpo
+    if st.button("⬅️ Voltar ao Menu", key="btn_voltar", use_container_width=True):
         st.session_state.pagina = "Início"
         st.rerun()
 
@@ -143,6 +129,7 @@ def gerador_loteria(nome, config):
         f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
         m_p = st.slider("Máximo de Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
+    # Botão de Gerar destaque com a cor do tema
     if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True, key="btn_gerar"):
         if len(selecionados) < dez_por_jogo:
             st.error(f"Selecione no mínimo {dez_por_jogo} números!")

@@ -25,12 +25,33 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#31333F"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS PARA O VOLANTE E BOTÕES PADRÃO
+# 2. CONSTRUÇÃO DO CSS DOS CARDS CLICÁVEIS
+estilos_cards = ""
+for nome, dados in TEMAS.items():
+    # Este seletor busca o botão pelo texto (label) exato
+    estilos_cards += f"""
+    button[aria-label="🍀 {nome}"] {{
+        height: 120px !important;
+        background-color: white !important;
+        border: 2px solid {dados['cor']} !important;
+        color: {dados['cor']} !important;
+        border-radius: 15px !important;
+        font-weight: bold !important;
+        font-size: 20px !important;
+        display: block !important;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.05) !important;
+    }}
+    button[aria-label="🍀 {nome}"]:hover {{
+        background-color: {dados['cor']}08 !important; /* Efeito suave no clique */
+        border-color: {dados['cor']} !important;
+    }}
+    """
+
 st.markdown(f"""
     <style>
     .titulo-custom {{ color: {cor_tema}; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
     
-    /* Cores do Volante Selecionado */
+    /* Estilo do Volante */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
@@ -38,7 +59,10 @@ st.markdown(f"""
         gap: 4px !important;
     }}
     
-    /* Botões de Comando (Limpar, Gerar) */
+    /* Injeção dos estilos dos cards clicáveis */
+    {estilos_cards}
+
+    /* Botões internos (Gerar, Limpar, Voltar) ficam normais */
     .stButton > button {{ border-radius: 8px !important; }}
     
     [data-testid="stSidebar"] {{ display: none; }}
@@ -66,29 +90,12 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
 def home():
     st.markdown('<div class="titulo-custom">🍀 Portal de Loterias</div>', unsafe_allow_html=True)
     st.write("---")
-    
     col1, col2 = st.columns(2)
-    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # CRIANDO O CARD COLORIDO COM HTML
-            st.markdown(f"""
-                <div style="
-                    border: 3px solid {dados['cor']};
-                    border-radius: 15px;
-                    padding: 20px;
-                    text-align: center;
-                    margin-bottom: 10px;
-                    background-color: white;
-                ">
-                    <span style="font-size: 30px;">🍀</span><br>
-                    <span style="color: {dados['cor']}; font-weight: bold; font-size: 20px;">{nome}</span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Botão Invisível de Ação logo abaixo do Card
-            if st.button(f"Abrir {nome}", key=f"goto_{nome}", use_container_width=True):
+            # O label do botão deve ser exatamente o que está no CSS aria-label
+            if st.button(f"🍀 {nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 
@@ -97,7 +104,7 @@ def gerador_loteria(nome, config):
         st.session_state.pagina = "Início"
         st.rerun()
 
-    st.markdown(f'<div class="titulo-custom">🍀 {nome}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="titulo-custom">🍀 Gerador {nome}</div>', unsafe_allow_html=True)
     
     key_sel = f"sel_{nome}"
     if key_sel not in st.session_state: st.session_state[key_sel] = []
@@ -107,7 +114,7 @@ def gerador_loteria(nome, config):
         if st.button("🎲 Surpresinha", use_container_width=True):
             st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar", use_container_width=True):
+        if st.button("❌ Limpar Seleção", use_container_width=True):
             st.session_state[key_sel] = []
             st.rerun()
 
@@ -122,8 +129,8 @@ def gerador_loteria(nome, config):
         dez_por_jogo = st.number_input("Bolas por jogo", config['min_sel'], config['total'], config['min_sel'])
         valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
     with col_b:
-        gerar_tudo = st.checkbox("Gerar TODAS")
-        qtd_max = st.number_input("Limite", 1, 1000000, 100, disabled=gerar_tudo)
+        gerar_tudo = st.checkbox("Gerar TODAS possíveis")
+        qtd_max = st.number_input("Limite de Jogos", 1, 1000000, 100, disabled=gerar_tudo)
 
     with st.expander("🛠️ Filtros Avançados"):
         f_s = st.checkbox("🚫 Evitar sequências")
@@ -136,12 +143,12 @@ def gerador_loteria(nome, config):
             st.error(f"Selecione no mínimo {dez_por_jogo} números!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
-            with st.spinner("Gerando..."):
+            with st.spinner("Gerando combinações..."):
                 combos = combinations(lista_n, dez_por_jogo)
                 res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
                 
                 if res:
-                    st.success(f"{len(res)} jogos!")
+                    st.success(f"{len(res)} jogos gerados!")
                     st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
                     df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
                     df.index += 1

@@ -21,7 +21,7 @@ st.markdown("""
     
     /* Impede o empilhamento das colunas individuais */
     [data-testid="stHorizontalBlock"].volante-container [data-testid="column"] {
-        width: 20% !important;
+        width: 100% !important;
         flex: 1 !important;
         min-width: 0 !important;
     }

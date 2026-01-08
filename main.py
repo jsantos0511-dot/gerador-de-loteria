@@ -6,14 +6,14 @@ import random
 import pandas as pd
 
 # 1. Configuração da Página
-st.set_page_config(page_title="Gerador Mega Sena", layout="centered")
+st.set_page_config(page_title="Mega Sena", layout="centered")
 
 # 2. Estilização CSS Personalizada
 st.markdown("""
     <style>
     /* Reduz o tamanho do título principal */
     h1 {
-        font-size: 1.8rem !important;
+        font-size: 2.8rem !important;
         text-align: center;
     }
     

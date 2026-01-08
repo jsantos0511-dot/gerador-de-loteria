@@ -25,45 +25,27 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#31333F"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. INJEÇÃO DE CSS AVANÇADA
-# Criamos regras de CSS específicas para cada botão baseado no rótulo (label)
-css_estilos = ""
-for nome, dados in TEMAS.items():
-    css_estilos += f"""
-    div[data-testid="stButton"] button:has(div p:contains("{nome}")) {{
-        height: 120px !important;
-        border: 3px solid {dados['cor']} !important;
-        color: {dados['cor']} !important;
-        background-color: white !important;
-        border-radius: 15px !important;
-        font-weight: bold !important;
-        font-size: 20px !important;
-    }}
-    """
-
+# 2. CSS PARA O VOLANTE E BOTÕES PADRÃO
 st.markdown(f"""
     <style>
     .titulo-custom {{ color: {cor_tema}; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
     
-    /* Cores do Volante */
+    /* Cores do Volante Selecionado */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
         gap: 4px !important;
     }}
-
-    /* Estilos dos Cards da Home */
-    {css_estilos}
-
-    /* Ajuste para não quebrar botões de comando */
+    
+    /* Botões de Comando (Limpar, Gerar) */
     .stButton > button {{ border-radius: 8px !important; }}
     
     [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE APOIO ---
+# --- FUNÇÃO DE FILTRO ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -84,12 +66,29 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
 def home():
     st.markdown('<div class="titulo-custom">🍀 Portal de Loterias</div>', unsafe_allow_html=True)
     st.write("---")
+    
     col1, col2 = st.columns(2)
+    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            # O botão precisa ter exatamente o nome para o CSS 'contains' funcionar
-            if st.button(f"🍀 {nome}", use_container_width=True):
+            # CRIANDO O CARD COLORIDO COM HTML
+            st.markdown(f"""
+                <div style="
+                    border: 3px solid {dados['cor']};
+                    border-radius: 15px;
+                    padding: 20px;
+                    text-align: center;
+                    margin-bottom: 10px;
+                    background-color: white;
+                ">
+                    <span style="font-size: 30px;">🍀</span><br>
+                    <span style="color: {dados['cor']}; font-weight: bold; font-size: 20px;">{nome}</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Botão Invisível de Ação logo abaixo do Card
+            if st.button(f"Abrir {nome}", key=f"goto_{nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 

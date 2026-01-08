@@ -28,7 +28,7 @@ st.markdown("""
 
     /* Estilo dos botões */
     .stButton > button {
-        width: 20% !important;
+        width: 100% !important;
         height: 60px !important;
         padding: 0 !important;
         font-weight: bold !important;

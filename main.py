@@ -6,38 +6,40 @@ import random
 import pandas as pd
 
 # 1. Configuração da Página
-st.set_page_config(page_title="Mega Sena", layout="centered")
+st.set_page_config(page_title="Gerador Mega Sena", layout="centered")
 
-# 2. Estilização CSS Personalizada
+# 2. CSS para Grade Rígida de 6 Colunas no Volante
 st.markdown("""
     <style>
-    /* Reduz o tamanho do título principal */
-    h1 {
-        font-size: 2.3rem !important;
-        text-align: center;
-    }
-    
-    /* Estiliza os botões do volante */
-    button[role="option"] {
-        min-width: 48px !important;
-        height: 45px !important;
+    /* Reduz o título principal */
+    h1 { font-size: 1.8rem !important; text-align: center; }
+
+    /* FORÇA A GRADE DE 6 COLUNAS NO SEGMENTED CONTROL */
+    div[data-testid="stSegmentedControl"] {
+        display: grid !important;
+        grid-template-columns: repeat(6, 1fr) !important;
+        gap: 8px !important;
         justify-content: center !important;
+    }
+
+    /* Estilo dos botões (Bolas) */
+    button[role="option"] {
+        width: 100% !important;
+        min-width: 0px !important;
+        height: 45px !important;
         font-weight: bold !important;
         border-radius: 8px !important;
-        font-size: 19px !important; /* Fonte ampliada para facilitar a visão */
+        font-size: 19px !important;
+        padding: 0 !important;
     }
-    
-    /* Ajustes de espaçamento para Mobile */
+
+    /* Ajustes para Mobile */
     .block-container { padding: 1rem 0.6rem !important; }
-    
-    /* Melhora visual das métricas */
-    [data-testid="stMetricValue"] { font-size: 1.5rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎰 Mega Sena")
+st.title("🎰 Gerador de Mega Sena")
 
-# Inicialização do estado da sessão
 if 'selecionados' not in st.session_state:
     st.session_state.selecionados = []
 
@@ -57,11 +59,11 @@ with c2:
         st.session_state.selecionados = []
         st.rerun()
 
-# Volante Compacto que não empilha
+# Volante com 6 colunas fixas
 opcoes_volante = [f"{i:02d}" for i in range(1, 61)]
 
 selecionados_finais = st.segmented_control(
-    "Toque nos números:",
+    "Volante:",
     options=opcoes_volante,
     selection_mode="multi",
     key="selecionados",
@@ -71,7 +73,7 @@ selecionados_finais = st.segmented_control(
 st.write(f"**Selecionados:** {len(selecionados_finais)} de 60")
 st.divider()
 
-# --- ÁREA DE CONFIGURAÇÕES ---
+# --- CONFIGURAÇÕES ---
 col_a, col_b = st.columns(2)
 with col_a:
     dez_por_jogo = st.number_input("Bolas por jogo", 6, 20, 6)
@@ -79,15 +81,13 @@ with col_a:
 with col_b:
     qtd_max = st.number_input("Limite de combinações", 1, 1000000, 100)
 
-# Botão de Gerar
 if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
     if len(selecionados_finais) < dez_por_jogo:
-        st.error(f"Selecione pelo menos {dez_por_jogo} números no volante.")
+        st.error(f"Selecione pelo menos {dez_por_jogo} números.")
     else:
-        # Converte para inteiros para a lógica de combinação
         lista_n = sorted([int(x) for x in selecionados_finais])
         
-        with st.spinner("Calculando combinações..."):
+        with st.spinner("Gerando..."):
             combos = combinations(lista_n, dez_por_jogo)
             res = []
             for c in combos:
@@ -96,22 +96,16 @@ if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
             
             if res:
                 st.success(f"{len(res)} combinações geradas!")
-                
-                # Cabeçalhos Bola 1, Bola 2...
                 colunas_bolas = [f"Bola {x+1}" for x in range(dez_por_jogo)]
-                
-                # Formatação dos dados para exibição (01, 02...)
                 res_formatado = [[f"{n:02d}" for n in jogo] for jogo in res]
                 
-                # Criação do DataFrame para a tabela
                 df_final = pd.DataFrame(res_formatado, columns=colunas_bolas)
-                df_final.index = df_final.index + 1  # Começa no 1
+                df_final.index = df_final.index + 1 
                 
                 st.dataframe(df_final, use_container_width=True)
                 
-                # --- DOWNLOAD ---
                 csv_io = io.StringIO()
-                csv_io.write('\ufeff') # Garante compatibilidade com Excel (UTF-8 com BOM)
+                csv_io.write('\ufeff')
                 w = csv.writer(csv_io, delimiter=';')
                 w.writerow(["ID"] + colunas_bolas)
                 for idx, r in enumerate(res):
@@ -124,5 +118,4 @@ if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
                     "text/csv", 
                     use_container_width=True
                 )
-
-                st.metric("Investimento Estimado", f"R$ {len(res)*valor_unit:,.2f}")
+                st.metric("Investimento Total", f"R$ {len(res)*valor_unit:,.2f}")

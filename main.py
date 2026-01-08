@@ -3,95 +3,94 @@ import csv
 from itertools import combinations
 import io
 
+# 1. Configuração da Página
 st.set_page_config(page_title="Gerador Loteria Pro", layout="wide")
 
-# --- 1. ESTADO DA SESSÃO ---
-if 'selecionados' not in st.session_state:
-    st.session_state.selecionados = set()
-
-# --- 2. LÓGICA DE CLIQUE (CAPTURADA POR QUERY PARAMS) ---
-# Usamos o rerun imediato para garantir que a seleção seja salva
-p = st.query_params
-if "n" in p:
-    num = int(p["n"])
-    if num in st.session_state.selecionados:
-        st.session_state.selecionados.remove(num)
-    else:
-        st.session_state.selecionados.add(num)
-    st.query_params.clear()
-    st.rerun()
-
-# --- 3. CSS "PIXEL PERFEITO" SEM COLUNAS STREAMLIT ---
+# 2. CSS de Grade Rígida (Pixel Perfeito)
 st.markdown("""
     <style>
+    /* Remove espaços inúteis no mobile */
     .block-container { padding: 1rem 0.5rem !important; }
     
-    /* Grade manual que ignora o layout do Streamlit */
-    .grade-fixa {
+    /* FORÇA A GRADE DE 6 COLUNAS SEM EMPILHAR */
+    .volante-container div[data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: repeat(6, 40px) !important;
+        grid-template-columns: repeat(6, 40px) !important; /* 6 colunas de 40px fixos */
         gap: 5px !important;
         justify-content: center;
-        margin: 10px auto;
-        padding: 0;
-        width: 270px; /* Largura total exata para evitar quebra */
+        width: 100% !important;
     }
 
-    /* Botões HTML com tamanho 40x30px e fonte 15px */
-    .btn-loteria {
+    /* Trava cada coluna para não expandir nem empilhar */
+    .volante-container div[data-testid="column"] {
+        width: 40px !important;
+        min-width: 40px !important;
+        flex: none !important;
+    }
+
+    /* Tamanho exato dos botões solicitado: 40x30px com fonte 15px */
+    .stButton > button {
         width: 40px !important;
         height: 30px !important;
+        padding: 0 !important;
         font-size: 15px !important;
-        font-weight: bold;
-        text-align: center;
-        line-height: 30px;
-        text-decoration: none !important;
-        background-color: #f0f2f6;
-        color: #31333f !important;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        display: inline-block;
+        font-weight: bold !important;
+        line-height: 30px !important;
+        border-radius: 4px !important;
     }
 
-    .btn-loteria.ativo {
-        background-color: #ff4b4b !important;
-        color: white !important;
-        border-color: #ff4b4b;
+    /* Impede que o restante da página (filtros/botões) fique esmagado */
+    .area-normal div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        grid-template-columns: none !important;
     }
-
-    /* Protege o resto do app do CSS acima */
-    .area-normal { width: 100%; }
     </style>
     """, unsafe_allow_html=True)
 
+# 3. Inicialização da Memória (Session State)
+if 'selecionados' not in st.session_state:
+    st.session_state.selecionados = set()
+
 st.title("🎰 Gerador Pro")
+
+# --- SEÇÃO DO VOLANTE ---
 st.subheader("Selecione as Dezenas")
-st.write(f"**Marcados:** {len(st.session_state.selecionados)}/60")
+st.write(f"**Selecionados:** {len(st.session_state.selecionados)}")
 
-# --- 4. O VOLANTE (HTML PURO) ---
-# Aqui eliminamos o st.columns e o st.button, que causavam o empilhamento
-volante_html = '<div class="grade-fixa">'
-for i in range(1, 61):
-    ativo = "ativo" if i in st.session_state.selecionados else ""
-    volante_html += f'<a href="?n={i}" target="_self" class="btn-loteria {ativo}">{i:02d}</a>'
-volante_html += '</div>'
+# Marcamos o início da área do volante para o CSS aplicar a grade de 6
+st.markdown('<div class="volante-container">', unsafe_allow_html=True)
 
-st.markdown(volante_html, unsafe_allow_html=True)
+# Criamos 10 linhas de 6 colunas
+for r in range(10):
+    cols = st.columns(6)
+    for c in range(6):
+        num = r * 6 + c + 1
+        is_sel = num in st.session_state.selecionados
+        
+        # Botão nativo: é o único 100% fiável para selecionar múltiplas dezenas
+        if cols[c].button(f"{num:02d}", key=f"btn_{num}", type="primary" if is_sel else "secondary"):
+            if is_sel:
+                st.session_state.selecionados.remove(num)
+            else:
+                st.session_state.selecionados.add(num)
+            st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
-# --- 5. CONFIGURAÇÕES E FILTROS (ÁREA NORMAL) ---
+# --- SEÇÃO DE FILTROS E GERAÇÃO (PROTEGIDA) ---
 st.markdown('<div class="area-normal">', unsafe_allow_html=True)
 
 c1, c2 = st.columns(2)
 with c1:
-    dez_por_jogo = st.number_input("Dezenas/jogo", 1, 20, 6)
+    dez_por_jogo = st.number_input("Dezenas por jogo", 1, 20, 6)
     valor_unit = st.number_input("Preço R$", 0.0, 500.0, 5.0)
 with c2:
     gerar_tudo = st.checkbox("Gerar Todas")
-    qtd_max = 1048576 if gerar_tudo else st.number_input("Limite de Jogos", 1, 1000000, 50)
+    qtd_max = 1048576 if gerar_tudo else st.number_input("Qtd Máxima", 1, 1000000, 50)
 
-st.markdown("### 🛠️ Filtros")
+st.markdown("### Filtros")
 f_seq = st.checkbox("🚫 Sem Sequências", True)
 f_fin = st.checkbox("🚫 Sem Finais Iguais", True)
 f_par = st.checkbox("⚖️ Equilibrar Par/Ímpar", True)
@@ -100,16 +99,14 @@ max_p = st.slider("Máx. Pares", 1, dez_por_jogo, max(1, dez_por_jogo-1))
 b1, b2 = st.columns(2)
 if b1.button("❌ Limpar Tudo", use_container_width=True):
     st.session_state.selecionados = set()
-    st.query_params.clear()
     st.rerun()
 
 gerar = b2.button("🚀 GERAR JOGOS!", type="primary", use_container_width=True)
 
-# --- 6. PROCESSAMENTO ---
 if gerar:
     lista_n = sorted(list(st.session_state.selecionados))
     if len(lista_n) < dez_por_jogo:
-        st.error(f"Selecione pelo menos {dez_por_jogo} dezenas!")
+        st.error(f"Selecione pelo menos {dez_por_jogo} números!")
     else:
         with st.spinner("Gerando..."):
             combos = combinations(lista_n, dez_por_jogo)
@@ -123,7 +120,7 @@ if gerar:
                     if p > max_p or (len(j)-p) > max_p: continue
                 res.append(j)
                 if len(res) >= qtd_max: break
-
+            
             if res:
                 st.divider()
                 m1, m2 = st.columns(2)

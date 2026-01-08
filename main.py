@@ -10,11 +10,11 @@ st.set_page_config(page_title="Portal Loterias Pro", layout="centered")
 
 # --- DICIONÁRIO DE CONFIGURAÇÕES ---
 TEMAS = {
-    "Mega-Sena": {"cor": "#209869", "total": 60, "cols": 6, "min_sel": 6, "preco": 5.0, "icone": "🍀"},
-    "Lotofácil": {"cor": "#930089", "total": 25, "cols": 5, "min_sel": 15, "preco": 3.0, "icone": "🍀"},
-    "Quina": {"cor": "#260085", "total": 80, "cols": 8, "min_sel": 5, "preco": 3.5, "icone": "🍀"},
-    "Lotomania": {"cor": "#f7941d", "total": 100, "cols": 10, "min_sel": 50, "preco": 3.0, "icone": "🍀"},
-    "Dupla Sena": {"cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "preco": 2.5, "icone": "🍀"}
+    "Mega-Sena": {"cor": "#209869", "total": 60, "cols": 6, "min_sel": 6, "preco": 5.0},
+    "Lotofácil": {"cor": "#930089", "total": 25, "cols": 5, "min_sel": 15, "preco": 3.0},
+    "Quina": {"cor": "#260085", "total": 80, "cols": 8, "min_sel": 5, "preco": 3.5},
+    "Lotomania": {"cor": "#f7941d", "total": 100, "cols": 10, "min_sel": 50, "preco": 3.0},
+    "Dupla Sena": {"cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "preco": 2.5}
 }
 
 # --- CONTROLE DE NAVEGAÇÃO ---
@@ -25,28 +25,19 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#31333F"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS DINÂMICO CUSTOMIZADO
-# Aqui geramos o CSS para cada card individualmente usando sua cor
-estilo_cards = ""
+# 2. INJEÇÃO DE CSS AVANÇADA
+# Criamos regras de CSS específicas para cada botão baseado no rótulo (label)
+css_estilos = ""
 for nome, dados in TEMAS.items():
-    estilo_cards += f"""
-    button[key="card_{nome}"] {{
-        height: 110px !important;
-        background-color: white !important;
-        border: 2px solid {dados['cor']} !important;
-        border-radius: 12px !important;
-        font-size: 1.1rem !important;
-        font-weight: bold !important;
+    css_estilos += f"""
+    div[data-testid="stButton"] button:has(div p:contains("{nome}")) {{
+        height: 120px !important;
+        border: 3px solid {dados['cor']} !important;
         color: {dados['cor']} !important;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.05) !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
-        white-space: pre-line !important;
-    }}
-    button[key="card_{nome}"]:hover {{
-        background-color: {dados['cor']}10 !important; /* Fundo leve com a cor da loteria no hover */
+        background-color: white !important;
+        border-radius: 15px !important;
+        font-weight: bold !important;
+        font-size: 20px !important;
     }}
     """
 
@@ -54,26 +45,25 @@ st.markdown(f"""
     <style>
     .titulo-custom {{ color: {cor_tema}; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
     
-    /* Estilo do Volante */
+    /* Cores do Volante */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
         gap: 4px !important;
     }}
-    button[role="option"] {{ min-width: 0px !important; width: 100% !important; height: 42px !important; font-weight: bold !important; }}
 
-    /* Injeção dos estilos dos cards individuais */
-    {estilo_cards}
+    /* Estilos dos Cards da Home */
+    {css_estilos}
 
-    /* Estilo padrão para botões de ação */
+    /* Ajuste para não quebrar botões de comando */
     .stButton > button {{ border-radius: 8px !important; }}
     
     [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE FILTRO ---
+# --- FUNÇÕES DE APOIO ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -98,26 +88,27 @@ def home():
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         with alvo:
-            if st.button(f"🍀\n{nome}", key=f"card_{nome}", use_container_width=True):
+            # O botão precisa ter exatamente o nome para o CSS 'contains' funcionar
+            if st.button(f"🍀 {nome}", use_container_width=True):
                 st.session_state.pagina = nome
                 st.rerun()
 
 def gerador_loteria(nome, config):
-    if st.button("⬅️ Voltar ao Menu", key="btn_voltar", use_container_width=True):
+    if st.button("⬅️ Voltar ao Menu", use_container_width=True):
         st.session_state.pagina = "Início"
         st.rerun()
 
-    st.markdown(f'<div class="titulo-custom">🍀 Gerador {nome}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="titulo-custom">🍀 {nome}</div>', unsafe_allow_html=True)
     
     key_sel = f"sel_{nome}"
     if key_sel not in st.session_state: st.session_state[key_sel] = []
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("🎲 Surpresinha", key="btn_surp", use_container_width=True):
+        if st.button("🎲 Surpresinha", use_container_width=True):
             st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar", key="btn_limp", use_container_width=True):
+        if st.button("❌ Limpar", use_container_width=True):
             st.session_state[key_sel] = []
             st.rerun()
 
@@ -141,7 +132,7 @@ def gerador_loteria(nome, config):
         f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
         m_p = st.slider("Máximo de Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
-    if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True, key="btn_gerar"):
+    if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
             st.error(f"Selecione no mínimo {dez_por_jogo} números!")
         else:
@@ -151,7 +142,7 @@ def gerador_loteria(nome, config):
                 res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
                 
                 if res:
-                    st.success(f"{len(res)} jogos gerados!")
+                    st.success(f"{len(res)} jogos!")
                     st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
                     df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
                     df.index += 1

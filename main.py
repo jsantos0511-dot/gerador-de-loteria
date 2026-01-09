@@ -29,32 +29,33 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS REFINADO (Cards menores e UI limpa)
+# 2. CSS REFINADO (Cards Compactos e UI Dark)
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
     
-    /* Cards Menores */
+    /* Cards Menores e Elegantes */
     .card-container {{
         border: 2px solid var(--cor-loteria);
         border-radius: 12px;
-        padding: 15px 10px;
+        padding: 12px 8px;
         text-align: center;
         background-color: #161b22;
         transition: all 0.2s ease;
         cursor: pointer;
         text-decoration: none !important;
         display: block;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
     }}
     .card-container:hover {{
         transform: scale(1.02);
         box-shadow: 0 0 15px var(--cor-loteria);
+        background-color: #1c2128;
     }}
-    .card-icon {{ font-size: 25px; margin-bottom: 5px; }}
-    .card-title {{ font-size: 18px; font-weight: bold; color: var(--cor-loteria); }}
+    .card-icon {{ font-size: 22px; margin-bottom: 3px; }}
+    .card-title {{ font-size: 17px; font-weight: bold; color: var(--cor-loteria); font-family: sans-serif; }}
 
-    /* Volante Compacto */
+    /* Volante (Segmented Control) */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
@@ -62,13 +63,14 @@ st.markdown(f"""
         gap: 3px !important;
     }}
 
-    /* Esconder elementos desnecessários */
+    /* Limpeza de UI */
     [data-testid="stSidebar"] {{ display: none; }}
     footer {{visibility: hidden;}}
-    .stNumberInput label, .stCheckbox label {{ font-size: 0.9rem !important; opacity: 0.8; }}
+    .stNumberInput label {{ font-size: 0.85rem !important; opacity: 0.7; }}
     </style>
     """, unsafe_allow_html=True)
 
+# --- LÓGICA DE FILTRO (RESTAURADA) ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -84,8 +86,10 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
         if not gerar_tudo and len(res) >= limite: break
     return res
 
+# --- PÁGINAS ---
+
 def home():
-    st.markdown('<h2 style="text-align:center; margin-bottom:30px;">🍀 Portal Loterias</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center; margin-bottom:25px;">🍀 Portal Loterias</h2>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
@@ -98,17 +102,19 @@ def home():
         alvo.markdown(card_html, unsafe_allow_html=True)
 
 def gerador_loteria(nome, config):
-    c_voltar, c_tit = st.columns([1, 4])
-    with c_voltar:
+    # Header minimalista
+    c_v, c_t = st.columns([1, 4])
+    with c_v:
         if st.button("⬅️ Sair", use_container_width=True):
             st.query_params.clear()
             st.session_state.pagina = "Início"
             st.rerun()
-    with c_tit:
-        st.markdown(f'<h3 style="color:{config["cor"]}; margin:0;">🍀 {nome}</h3>', unsafe_allow_html=True)
+    with c_t:
+        st.markdown(f'<h3 style="color:{config["cor"]}; margin:0; padding-top:5px;">🍀 {nome}</h3>', unsafe_allow_html=True)
 
-    # Ações Rápidas
     st.write("")
+    
+    # Ações Rápidas
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🎲 Surpresinha", use_container_width=True):
@@ -118,12 +124,12 @@ def gerador_loteria(nome, config):
             st.session_state[f"sel_{nome}"] = []
             st.rerun()
 
+    # Volante
     opcoes = [f"{i:02d}" for i in range(1, config['total'] + 1)]
     selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
-    
     st.caption(f"Selecionados: {len(selecionados)}")
 
-    # Configurações Enxutas
+    # Configurações de Aposta (Compactas)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         dez_por_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
@@ -132,34 +138,36 @@ def gerador_loteria(nome, config):
     with col_c:
         qtd_max = st.number_input("Limite", 1, 1000000, 100)
 
-    # Filtros Simplificados
-    c_f1, c_f2 = st.columns(2)
-    with c_f1: f_s = st.checkbox("Sem Sequências")
-    with c_f2: f_p = st.checkbox("Equilibrar Pares")
-    
-    m_p = st.slider("Qtd Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
+    # --- SISTEMA DE FILTROS ANTERIOR (RESTAURADO) ---
+    with st.expander("🛠️ Filtros Inteligentes"):
+        f_s = st.checkbox("🚫 Sem sequências (ex: 01, 02)")
+        f_f = st.checkbox("🚫 Limitar finais iguais")
+        f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
+        m_p = st.slider("Máx. Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
     if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
-            st.error(f"Selecione {dez_por_jogo} números!")
+            st.error(f"Selecione no mínimo {dez_por_jogo} números!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
-            combos = combinations(lista_n, dez_por_jogo)
-            res = aplicar_filtros(combos, f_s, False, f_p, m_p, dez_por_jogo, qtd_max, False)
-            
-            if res:
-                st.success(f"{len(res)} jogos!")
-                st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
-                df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
-                st.dataframe(df, use_container_width=True)
+            with st.spinner("Processando..."):
+                combos = combinations(lista_n, dez_por_jogo)
+                res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, False)
                 
-                csv_io = io.StringIO()
-                csv_io.write('\ufeff')
-                w = csv.writer(csv_io, delimiter=';')
-                w.writerow(["ID"] + [f"D{i+1}" for i in range(dez_por_jogo)])
-                for idx, r in enumerate(res): w.writerow([idx + 1] + [f"{n:02d}" for n in r])
-                st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", use_container_width=True)
+                if res:
+                    st.success(f"{len(res)} jogos gerados!")
+                    st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
+                    df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
+                    st.dataframe(df, use_container_width=True)
+                    
+                    csv_io = io.StringIO()
+                    csv_io.write('\ufeff')
+                    w = csv.writer(csv_io, delimiter=';')
+                    w.writerow(["ID"] + [f"B{i+1}" for i in range(dez_por_jogo)])
+                    for idx, r in enumerate(res): w.writerow([idx + 1] + [f"{n:02d}" for n in r])
+                    st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", use_container_width=True)
 
+# --- EXECUÇÃO ---
 if st.session_state.pagina == "Início":
     home()
 else:

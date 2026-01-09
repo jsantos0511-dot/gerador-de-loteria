@@ -25,52 +25,49 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS DINÂMICO (DARK MODE + CARDS COLORIDOS)
-estilos_cards = ""
+# 2. CSS DE ALTA PRIORIDADE PARA OS CARDS
+css_cards = ""
 for nome, dados in TEMAS.items():
-    estilos_cards += f"""
-    /* Formata o botão para parecer um Card */
-    div[data-testid="stButton"] button[key="btn_{nome}"] {{
-        height: 120px !important;
+    css_cards += f"""
+    /* Força a cor da borda e do texto para cada botão específico */
+    div[data-testid="stButton"] button:has(div p:contains("{nome}")) {{
         background-color: #0e1117 !important;
         border: 2px solid {dados['cor']} !important;
         color: {dados['cor']} !important;
-        border-radius: 15px !important;
+        height: 80px !important;
+        border-radius: 12px !important;
         font-weight: bold !important;
-        font-size: 24px !important;
-        margin-bottom: 20px !important;
-        transition: 0.3s !important;
+        font-size: 20px !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
     }}
-    /* Efeito ao passar o mouse */
-    div[data-testid="stButton"] button[key="btn_{nome}"]:hover {{
-        background-color: {dados['cor']}20 !important;
-        border-color: #ffffff !important;
-        color: #ffffff !important;
-        transform: translateY(-3px) !important;
+    div[data-testid="stButton"] button:has(div p:contains("{nome}")):hover {{
+        background-color: {dados['cor']} !important;
+        color: white !important;
+        border-color: white !important;
     }}
     """
 
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
-    .titulo-custom {{ color: {cor_tema}; font-size: 2.2rem; font-weight: bold; text-align: center; margin-bottom: 25px; }}
+    .titulo-custom {{ color: white; font-size: 2rem; font-weight: bold; text-align: center; margin-bottom: 30px; }}
     
-    /* Injeção dos estilos dos botões-cards */
-    {estilos_cards}
+    /* Aplica os estilos dos cards */
+    {css_cards}
 
-    /* Estilo do Volante (Segmented Control) */
+    /* Ajuste do Volante (Números) */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
-        gap: 4px !important;
+        gap: 5px !important;
     }}
     
     [data-testid="stSidebar"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE FILTRO ---
+# --- LÓGICA DE FILTRO ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -90,24 +87,19 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
 
 def home():
     st.markdown('<div class="titulo-custom">🍀 Portal de Loterias</div>', unsafe_allow_html=True)
-    st.write("---")
     
-    col1, col2 = st.columns(2)
-    for i, (nome, dados) in enumerate(TEMAS.items()):
-        alvo = col1 if i % 2 == 0 else col2
-        with alvo:
-            # O próprio botão agora é o Card. O texto é apenas o Nome.
-            # O trevo 🍀 é opcional, deixei dentro do nome para manter o estilo
-            if st.button(f"🍀 {nome}", key=f"btn_{nome}", use_container_width=True):
-                st.session_state.pagina = nome
-                st.rerun()
+    # Exibição em lista vertical para parecer com a sua imagem, mas colorida
+    for nome in TEMAS.keys():
+        if st.button(f"🍀 {nome}", use_container_width=True):
+            st.session_state.pagina = nome
+            st.rerun()
 
 def gerador_loteria(nome, config):
-    if st.button("⬅️ Menu Principal", use_container_width=True):
+    if st.button("⬅️ Menu Inicial", use_container_width=True):
         st.session_state.pagina = "Início"
         st.rerun()
 
-    st.markdown(f'<div class="titulo-custom">🍀 {nome}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="titulo-custom" style="color:{config["cor"]}">🍀 {nome}</div>', unsafe_allow_html=True)
     
     key_sel = f"sel_{nome}"
     if key_sel not in st.session_state: st.session_state[key_sel] = []
@@ -117,51 +109,42 @@ def gerador_loteria(nome, config):
         if st.button("🎲 Surpresinha", use_container_width=True):
             st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar Seleção", use_container_width=True):
+        if st.button("❌ Limpar", use_container_width=True):
             st.session_state[key_sel] = []
             st.rerun()
 
     opcoes = [f"{i:02d}" for i in range(1, config['total'] + 1)]
     selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=key_sel, label_visibility="collapsed")
     
-    st.info(f"**{len(selecionados)}** números selecionados")
+    st.write(f"**Selecionados:** {len(selecionados)}")
+    st.divider()
 
     col_a, col_b = st.columns(2)
     with col_a:
-        dez_por_jogo = st.number_input("Dezenas por jogo", config['min_sel'], config['total'], config['min_sel'])
-        valor_unit = st.number_input("Valor da aposta R$", 0.0, 5000.0, config['preco'])
+        dez_por_jogo = st.number_input("Bolas por jogo", config['min_sel'], config['total'], config['min_sel'])
+        valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
     with col_b:
-        gerar_tudo = st.checkbox("Gerar TODAS possíveis")
-        qtd_max = st.number_input("Limite de jogos", 1, 1000000, 100, disabled=gerar_tudo)
-
-    with st.expander("🛠️ Filtros Inteligentes"):
-        f_s = st.checkbox("🚫 Evitar Sequências")
-        f_f = st.checkbox("🚫 Evitar Finais Repetidos")
-        f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
-        m_p = st.slider("Máximo de Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
+        gerar_tudo = st.checkbox("Gerar TODAS")
+        qtd_max = st.number_input("Limite", 1, 1000000, 100, disabled=gerar_tudo)
 
     if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
-            st.error(f"Selecione pelo menos {dez_por_jogo} números no volante!")
+            st.error(f"Selecione {dez_por_jogo} números!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
-            with st.spinner("Calculando combinações..."):
-                combos = combinations(lista_n, dez_por_jogo)
-                res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
+            combos = combinations(lista_n, dez_por_jogo)
+            res = aplicar_filtros(combos, False, False, False, 0, dez_por_jogo, qtd_max, gerar_tudo)
+            
+            if res:
+                st.success(f"{len(res)} jogos!")
+                df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
+                st.dataframe(df, use_container_width=True)
                 
-                if res:
-                    st.success(f"{len(res)} jogos gerados!")
-                    st.metric("Investimento", f"R$ {len(res)*valor_unit:,.2f}")
-                    df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
-                    st.dataframe(df, use_container_width=True)
-                    
-                    csv_io = io.StringIO()
-                    csv_io.write('\ufeff')
-                    w = csv.writer(csv_io, delimiter=';')
-                    w.writerow(["Jogo"] + [f"D{i+1}" for i in range(dez_por_jogo)])
-                    for idx, r in enumerate(res):
-                        w.writerow([idx + 1] + [f"{n:02d}" for n in r])
-                    st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"jogos_{nome.lower()}.csv", "text/csv", use_container_width=True)
+                csv_io = io.StringIO()
+                w = csv.writer(csv_io, delimiter=';')
+                w.writerow(["ID"] + [f"B{i+1}" for i in range(dez_por_jogo)])
+                for idx, r in enumerate(res): w.writerow([idx + 1] + [f"{n:02d}" for n in r])
+                st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", "text/csv", use_container_width=True)
 
 # --- NAVEGAÇÃO ---
 if st.session_state.pagina == "Início":

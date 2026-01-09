@@ -29,7 +29,7 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS (Base mantida do seu código final)
+# 2. CSS (Base mantida e refinada)
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
@@ -90,9 +90,9 @@ def gerador_loteria(nome, config):
             st.rerun()
     with c_t: st.markdown(f'<h3 style="color:{config["cor"]}; margin:0;">🍀 {nome}</h3>', unsafe_allow_html=True)
 
-    # ORGANIZAÇÃO EM ABAS
-    aba_gerar, aba_conferir = st.tabs(["🚀 Gerador", "🎯 Conferidor"])
+    aba_gerar, aba_estatisticas, aba_conferir = st.tabs(["🚀 Gerador", "📊 Estatísticas", "🎯 Conferidor"])
 
+    # --- ABA GERADOR ---
     with aba_gerar:
         c1, c2 = st.columns(2)
         with c1:
@@ -112,7 +112,8 @@ def gerador_loteria(nome, config):
             gerar_tudo = st.checkbox("Gerar Todos")
             qtd_max = st.number_input("Limite", 1, 1000000, 100, disabled=gerar_tudo)
 
-        with st.expander("🛠️ Filtros Inteligentes", expanded=True):
+        # FILTROS OCULTOS POR PADRÃO (expanded=False)
+        with st.expander("🛠️ Filtros Inteligentes", expanded=False):
             f_s = st.checkbox("🚫 Sem sequências")
             f_f = st.checkbox("🚫 Limitar finais iguais (máx 4)")
             f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
@@ -124,7 +125,7 @@ def gerador_loteria(nome, config):
                 lista_n = sorted([int(x) for x in selecionados])
                 combos = combinations(lista_n, dez_por_jogo)
                 res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
-                st.session_state[f"ultimos_jogos_{nome}"] = res # Salva para o conferidor
+                st.session_state[f"ultimos_jogos_{nome}"] = res 
                 
                 if res:
                     st.success(f"{len(res)} jogos!")
@@ -138,32 +139,53 @@ def gerador_loteria(nome, config):
                     for idx, r in enumerate(res): w.writerow([idx + 1] + [f"{n:02d}" for n in r])
                     st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", use_container_width=True)
 
+    # --- ABA ESTATÍSTICAS ---
+    with aba_estatisticas:
+        st.subheader("📊 Análise da Seleção Atual")
+        if not selecionados:
+            st.info("Selecione números no volante para ver as estatísticas da sua escolha.")
+        else:
+            nums_int = [int(n) for n in selecionados]
+            pares = [n for n in nums_int if n % 2 == 0]
+            impares = [n for n in nums_int if n % 2 != 0]
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Pares", len(pares))
+            c2.metric("Ímpares", len(impares))
+            
+            # Gráfico de Finais
+            finais_contagem = pd.Series([n % 10 for n in nums_int]).value_counts().sort_index()
+            st.write("**Distribuição por Final (0-9):**")
+            st.bar_chart(finais_contagem, color=config['cor'])
+            
+            # Gráfico de Dezenas (Faixas)
+            faixas = pd.cut(nums_int, bins=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 
+                           labels=['1-10', '11-20', '21-30', '31-40', '41-50', '51-60', '61-70', '71-80', '81-90', '91-100'])
+            st.write("**Distribuição por Faixas Numéricas:**")
+            st.bar_chart(faixas.value_counts().sort_index(), color=config['cor'])
+
+    # --- ABA CONFERIR ---
     with aba_conferir:
         st.subheader("🎯 Conferir Acertos")
         if f"ultimos_jogos_{nome}" not in st.session_state:
             st.warning("Gere jogos primeiro para poder conferir os acertos.")
         else:
-            txt_resultado = st.text_input("Insira os números sorteados (separados por espaço ou vírgula)", placeholder="Ex: 05, 12, 28, 40, 52, 60")
+            txt_resultado = st.text_input("Números sorteados", placeholder="Ex: 05, 12, 28, 40, 52, 60")
             if txt_resultado:
                 try:
-                    # Limpa e converte o input do usuário
                     num_sorteados = [int(n.strip()) for n in txt_resultado.replace(',', ' ').split() if n.strip().isdigit()]
                     if len(num_sorteados) > 0:
                         jogos = st.session_state[f"ultimos_jogos_{nome}"]
                         resultados_conferidos = []
-                        
                         for j in jogos:
                             acertos = set(j).intersection(set(num_sorteados))
                             resultados_conferidos.append(list(j) + [len(acertos)])
                         
                         df_res = pd.DataFrame(resultados_conferidos, columns=[f"D{i+1}" for i in range(len(jogos[0]))] + ["✅ Acertos"])
-                        # Ordena pelos que tiveram mais acertos
                         df_res = df_res.sort_values(by="✅ Acertos", ascending=False)
-                        
-                        st.write("### Resultado da Conferência:")
                         st.dataframe(df_res.style.highlight_max(subset=["✅ Acertos"], color=config['cor']), use_container_width=True)
                 except:
-                    st.error("Formato de resultado inválido. Use apenas números.")
+                    st.error("Formato inválido.")
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início": home()

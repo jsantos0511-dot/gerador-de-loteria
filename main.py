@@ -34,7 +34,6 @@ st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
     
-    /* Cards Menores e Elegantes */
     .card-container {{
         border: 2px solid var(--cor-loteria);
         border-radius: 12px;
@@ -55,7 +54,6 @@ st.markdown(f"""
     .card-icon {{ font-size: 22px; margin-bottom: 3px; }}
     .card-title {{ font-size: 17px; font-weight: bold; color: var(--cor-loteria); font-family: sans-serif; }}
 
-    /* Volante (Segmented Control) */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
@@ -63,25 +61,30 @@ st.markdown(f"""
         gap: 3px !important;
     }}
 
-    /* Limpeza de UI */
     [data-testid="stSidebar"] {{ display: none; }}
     footer {{visibility: hidden;}}
     .stNumberInput label {{ font-size: 0.85rem !important; opacity: 0.7; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- LÓGICA DE FILTRO (RESTAURADA) ---
+# --- LÓGICA DE FILTRO (RESTAURADA COM LIMITE DE FINAIS = 4) ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
         jogo = list(c)
+        # Filtro de Sequências
         if f_seq and any(jogo[i+1] == jogo[i]+1 for i in range(len(jogo)-1)): continue
+        
+        # Filtro de Finais (Máximo 4 iguais)
         if f_finais:
             finais = [n % 10 for n in jogo]
             if any(finais.count(f) > 4 for f in finais): continue
+            
+        # Filtro de Paridade
         if f_par:
             p = len([n for n in jogo if n % 2 == 0])
             if p > max_p or (dez_jogo - p) > max_p: continue
+            
         res.append(jogo)
         if not gerar_tudo and len(res) >= limite: break
     return res
@@ -102,7 +105,6 @@ def home():
         alvo.markdown(card_html, unsafe_allow_html=True)
 
 def gerador_loteria(nome, config):
-    # Header minimalista
     c_v, c_t = st.columns([1, 4])
     with c_v:
         if st.button("⬅️ Sair", use_container_width=True):
@@ -114,7 +116,6 @@ def gerador_loteria(nome, config):
 
     st.write("")
     
-    # Ações Rápidas
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🎲 Surpresinha", use_container_width=True):
@@ -124,24 +125,24 @@ def gerador_loteria(nome, config):
             st.session_state[f"sel_{nome}"] = []
             st.rerun()
 
-    # Volante
     opcoes = [f"{i:02d}" for i in range(1, config['total'] + 1)]
     selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
     st.caption(f"Selecionados: {len(selecionados)}")
 
-    # Configurações de Aposta (Compactas)
+    # Configurações de Aposta
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         dez_por_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
     with col_b:
         valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
     with col_c:
-        qtd_max = st.number_input("Limite", 1, 1000000, 100)
+        gerar_tudo = st.checkbox("Gerar Todos")
+        qtd_max = st.number_input("Limite", 1, 1000000, 100, disabled=gerar_tudo)
 
-    # --- SISTEMA DE FILTROS ANTERIOR (RESTAURADO) ---
-    with st.expander("🛠️ Filtros Inteligentes"):
+    # Sistema de Filtros Completo
+    with st.expander("🛠️ Filtros Inteligentes", expanded=True):
         f_s = st.checkbox("🚫 Sem sequências (ex: 01, 02)")
-        f_f = st.checkbox("🚫 Limitar finais iguais")
+        f_f = st.checkbox("🚫 Limitar finais iguais (máx 4)")
         f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
         m_p = st.slider("Máx. Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
@@ -150,13 +151,13 @@ def gerador_loteria(nome, config):
             st.error(f"Selecione no mínimo {dez_por_jogo} números!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
-            with st.spinner("Processando..."):
+            with st.spinner("Processando combinações..."):
                 combos = combinations(lista_n, dez_por_jogo)
-                res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, False)
+                res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
                 
                 if res:
                     st.success(f"{len(res)} jogos gerados!")
-                    st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
+                    st.metric("Investimento Total", f"R$ {len(res)*valor_unit:,.2f}")
                     df = pd.DataFrame(res, columns=[f"B{i+1}" for i in range(dez_por_jogo)])
                     st.dataframe(df, use_container_width=True)
                     
@@ -166,6 +167,8 @@ def gerador_loteria(nome, config):
                     w.writerow(["ID"] + [f"B{i+1}" for i in range(dez_por_jogo)])
                     for idx, r in enumerate(res): w.writerow([idx + 1] + [f"{n:02d}" for n in r])
                     st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", use_container_width=True)
+                else:
+                    st.warning("Nenhum jogo encontrado com esses filtros.")
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início":

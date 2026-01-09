@@ -107,7 +107,7 @@ def home():
 def gerador_loteria(nome, config):
     c_v, c_t = st.columns([1, 4])
     with c_v:
-        if st.button("⬅️ Sair", use_container_width=True):
+        if st.button("⬅️ Voltar ao menu", use_container_width=True):
             st.query_params.clear()
             st.session_state.pagina = "Início"
             st.rerun()
@@ -136,7 +136,7 @@ def gerador_loteria(nome, config):
     with col_b:
         valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
     with col_c:
-        gerar_tudo = st.checkbox("Gerar Todos")
+        gerar_tudo = st.checkbox("Gerar TODAS combinações possíveis")
         qtd_max = st.number_input("Limite", 1, 1000000, 100, disabled=gerar_tudo)
 
     # Sistema de Filtros Completo

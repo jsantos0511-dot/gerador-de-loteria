@@ -17,7 +17,7 @@ TEMAS = {
     "Dupla Sena": {"cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "preco": 2.5}
 }
 
-# --- NAVEGAÇÃO VIA QUERY PARAMS ---
+# --- NAVEGAÇÃO ---
 params = st.query_params
 if "escolha" in params:
     st.session_state.pagina = params["escolha"]
@@ -29,47 +29,46 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
-# 2. CSS PARA O MENU DE CARDS E VOLANTE
+# 2. CSS REFINADO (Cards menores e UI limpa)
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
     
-    /* Estilização dos Cards da Home */
+    /* Cards Menores */
     .card-container {{
         border: 2px solid var(--cor-loteria);
-        border-radius: 20px;
-        padding: 30px 20px;
+        border-radius: 12px;
+        padding: 15px 10px;
         text-align: center;
         background-color: #161b22;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         cursor: pointer;
         text-decoration: none !important;
         display: block;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        margin-bottom: 15px;
     }}
     .card-container:hover {{
-        transform: translateY(-5px);
-        box-shadow: 0 0 20px var(--cor-loteria);
-        background-color: #1c2128;
+        transform: scale(1.02);
+        box-shadow: 0 0 15px var(--cor-loteria);
     }}
-    .card-icon {{ font-size: 40px; margin-bottom: 10px; }}
-    .card-title {{ font-size: 22px; font-weight: bold; color: var(--cor-loteria); }}
+    .card-icon {{ font-size: 25px; margin-bottom: 5px; }}
+    .card-title {{ font-size: 18px; font-weight: bold; color: var(--cor-loteria); }}
 
-    /* Estilo do Volante (Segmented Control) */
+    /* Volante Compacto */
     button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
     div[data-testid="stSegmentedControl"] {{
         display: grid !important;
         grid-template-columns: repeat({cols_v}, 1fr) !important;
-        gap: 5px !important;
+        gap: 3px !important;
     }}
 
+    /* Esconder elementos desnecessários */
     [data-testid="stSidebar"] {{ display: none; }}
     footer {{visibility: hidden;}}
+    .stNumberInput label, .stCheckbox label {{ font-size: 0.9rem !important; opacity: 0.8; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE FILTRO ---
 def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, gerar_tudo):
     res = []
     for c in combos:
@@ -85,10 +84,8 @@ def aplicar_filtros(combos, f_seq, f_finais, f_par, max_p, dez_jogo, limite, ger
         if not gerar_tudo and len(res) >= limite: break
     return res
 
-# --- PÁGINAS ---
-
 def home():
-    st.markdown('<h1 style="text-align:center; margin-bottom:40px;">🍀 Portal de Loterias</h1>', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center; margin-bottom:30px;">🍀 Portal Loterias</h2>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
@@ -101,89 +98,68 @@ def home():
         alvo.markdown(card_html, unsafe_allow_html=True)
 
 def gerador_loteria(nome, config):
-    # Cabeçalho da Página da Loteria
-    col_voltar, col_titulo = st.columns([1, 4])
-    with col_voltar:
-        if st.button("⬅️ Menu", use_container_width=True):
+    c_voltar, c_tit = st.columns([1, 4])
+    with c_voltar:
+        if st.button("⬅️ Sair", use_container_width=True):
             st.query_params.clear()
             st.session_state.pagina = "Início"
             st.rerun()
-    with col_titulo:
-        st.markdown(f'<h2 style="color:{config["cor"]}; margin:0;">🍀 {nome}</h2>', unsafe_allow_html=True)
+    with c_tit:
+        st.markdown(f'<h3 style="color:{config["cor"]}; margin:0;">🍀 {nome}</h3>', unsafe_allow_html=True)
 
-    st.divider()
-    
-    # --- VOLANTE E SELEÇÃO ---
-    key_sel = f"sel_{nome}"
-    if key_sel not in st.session_state: st.session_state[key_sel] = []
-    
+    # Ações Rápidas
+    st.write("")
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🎲 Surpresinha", use_container_width=True):
-            st.session_state[key_sel] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
+            st.session_state[f"sel_{nome}"] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
     with c2:
-        if st.button("❌ Limpar Seleção", use_container_width=True):
-            st.session_state[key_sel] = []
+        if st.button("❌ Limpar", use_container_width=True):
+            st.session_state[f"sel_{nome}"] = []
             st.rerun()
 
     opcoes = [f"{i:02d}" for i in range(1, config['total'] + 1)]
-    selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=key_sel, label_visibility="collapsed")
+    selecionados = st.segmented_control("V", options=opcoes, selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
     
-    st.info(f"**{len(selecionados)}** números selecionados no volante.")
+    st.caption(f"Selecionados: {len(selecionados)}")
 
-    # --- CONFIGURAÇÕES TÉCNICAS ---
-    st.subheader("⚙️ Configurações da Aposta")
-    col_a, col_b = st.columns(2)
+    # Configurações Enxutas
+    col_a, col_b, col_c = st.columns(3)
     with col_a:
-        dez_por_jogo = st.number_input("Dezenas por jogo", config['min_sel'], config['total'], config['min_sel'])
-        valor_unit = st.number_input("Preço da aposta (R$)", 0.0, 5000.0, config['preco'])
+        dez_por_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
     with col_b:
-        gerar_tudo = st.checkbox("Gerar todas as combinações")
-        qtd_max = st.number_input("Limite de jogos", 1, 1000000, 100, disabled=gerar_tudo)
+        valor_unit = st.number_input("Preço R$", 0.0, 5000.0, config['preco'])
+    with col_c:
+        qtd_max = st.number_input("Limite", 1, 1000000, 100)
 
-    # --- FILTROS ---
-    with st.expander("🛠️ Filtros Avançados"):
-        f_s = st.checkbox("🚫 Evitar Sequências (ex: 01-02-03)")
-        f_f = st.checkbox("🚫 Limitar Finais Iguais (máx 4)")
-        f_p = st.checkbox("⚖️ Equilibrar Par/Ímpar")
-        m_p = st.slider("Quantidade de Pares permitida", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
+    # Filtros Simplificados
+    c_f1, c_f2 = st.columns(2)
+    with c_f1: f_s = st.checkbox("Sem Sequências")
+    with c_f2: f_p = st.checkbox("Equilibrar Pares")
+    
+    m_p = st.slider("Qtd Pares", 0, dez_por_jogo, dez_por_jogo // 2) if f_p else dez_por_jogo
 
-    # --- PROCESSAMENTO ---
-    if st.button(f"🚀 GERAR JOGOS PARA {nome.upper()}", type="primary", use_container_width=True):
+    if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
         if len(selecionados) < dez_por_jogo:
-            st.error(f"Selecione pelo menos {dez_por_jogo} números no volante para gerar apostas de {dez_por_jogo} dezenas!")
+            st.error(f"Selecione {dez_por_jogo} números!")
         else:
             lista_n = sorted([int(x) for x in selecionados])
-            with st.spinner("Calculando combinações..."):
-                combos = combinations(lista_n, dez_por_jogo)
-                res = aplicar_filtros(combos, f_s, f_f, f_p, m_p, dez_por_jogo, qtd_max, gerar_tudo)
+            combos = combinations(lista_n, dez_por_jogo)
+            res = aplicar_filtros(combos, f_s, False, f_p, m_p, dez_por_jogo, qtd_max, False)
+            
+            if res:
+                st.success(f"{len(res)} jogos!")
+                st.metric("Total", f"R$ {len(res)*valor_unit:,.2f}")
+                df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
+                st.dataframe(df, use_container_width=True)
                 
-                if res:
-                    st.success(f"Sucesso! {len(res)} jogos gerados.")
-                    st.metric("Investimento Total", f"R$ {len(res)*valor_unit:,.2f}")
-                    
-                    df = pd.DataFrame(res, columns=[f"D{i+1}" for i in range(dez_por_jogo)])
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # Preparação do CSV
-                    csv_io = io.StringIO()
-                    csv_io.write('\ufeff') # UTF-8 BOM para Excel
-                    w = csv.writer(csv_io, delimiter=';')
-                    w.writerow(["ID"] + [f"D{i+1}" for i in range(dez_por_jogo)])
-                    for idx, r in enumerate(res):
-                        w.writerow([idx + 1] + [f"{n:02d}" for n in r])
-                    
-                    st.download_button(
-                        label="💾 Baixar Resultados em CSV",
-                        data=csv_io.getvalue().encode('utf-8-sig'),
-                        file_name=f"jogos_{nome.lower()}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("Nenhum jogo atendeu aos filtros selecionados. Tente relaxar as restrições.")
+                csv_io = io.StringIO()
+                csv_io.write('\ufeff')
+                w = csv.writer(csv_io, delimiter=';')
+                w.writerow(["ID"] + [f"D{i+1}" for i in range(dez_por_jogo)])
+                for idx, r in enumerate(res): w.writerow([idx + 1] + [f"{n:02d}" for n in r])
+                st.download_button("💾 Baixar CSV", csv_io.getvalue().encode('utf-8-sig'), f"{nome}.csv", use_container_width=True)
 
-# --- EXECUÇÃO ---
 if st.session_state.pagina == "Início":
     home()
 else:

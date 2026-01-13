@@ -34,7 +34,7 @@ TEMAS = {
     "Dupla Sena": {"cor": "#a61324", "total": 50, "cols": 10, "min_sel": 6, "api": "duplasena", "garantias": ["Quadra", "Quina"]}
 }
 
-# --- FUNÇÕES DE FORMATAÇÃO ---
+# --- FUNÇÕES DE APOIO ---
 def formata_dinheiro(valor):
     try: return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except: return "R$ 0,00"
@@ -49,50 +49,55 @@ def buscar_resultado_api(loteria_slug):
         return response.json() if response.status_code == 200 else None
     except: return None
 
-# --- ESTILO CSS ---
+# --- CSS E LAYOUT ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #ffffff; }
-    .card-container { border: 2px solid var(--cor-loteria); border-radius: 12px; padding: 15px; text-align: center; background-color: #161b22; display: block; margin-bottom: 12px; text-decoration: none !important; }
+    .card-container { 
+        border: 2px solid var(--cor-loteria); border-radius: 12px; padding: 15px; 
+        text-align: center; background-color: #161b22; display: block; 
+        margin-bottom: 12px; text-decoration: none !important; 
+    }
     .card-title { font-size: 18px; font-weight: bold; color: #ffffff; }
-    .notificacao { padding: 12px; border-radius: 8px; background: #1c2128; border-left: 5px solid #ffcc00; margin-bottom: 10px; font-size: 13px; }
+    .notificacao { 
+        padding: 10px; border-radius: 8px; background: #1c2128; 
+        border-left: 5px solid #ffcc00; margin-bottom: 8px; font-size: 12px; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- NAVEGAÇÃO ---
-params = st.query_params
+# --- LOGICA DE NAVEGAÇÃO ---
 if "pagina" not in st.session_state:
-    st.session_state.pagina = params.get("escolha", "Início")
+    st.session_state.pagina = st.query_params.get("escolha", "Início")
 
 # --- TELAS ---
 def home():
     st.markdown('<h2 style="text-align:center;">🍀 Portal Loterias Pro</h2>', unsafe_allow_html=True)
     
-    # 🔔 NOTIFICAÇÕES AMPLIADAS
-    st.write("🔔 **Prêmios Acumulados Hoje:**")
-    loterias_check = ["megasena", "lotofacil", "quina", "duplasena"]
-    cols_n = st.columns(len(loterias_check))
+    # 🔔 NOTIFICAÇÕES (FORMATO CORRIGIDO)
+    st.write("🔔 **Acumulados:**")
+    loterias_check = ["megasena", "lotofacil", "quina"]
+    cols_n = st.columns(3)
     for idx, slug in enumerate(loterias_check):
         res = buscar_resultado_api(slug)
         if res and res.get('acumulou'):
             valor = formata_dinheiro(res['valorEstimadoProximoConcurso'])
-            cols_n[idx].markdown(f'<div class="notificacao"><b>{res["loteria"].split()[0]}</b><br><span style="color:#00ff00;">{valor}</span></div>', unsafe_allow_html=True)
+            cols_n[idx].markdown(f'<div class="notificacao"><b>{slug.capitalize()}</b><br><span style="color:#00ff00;">{valor}</span></div>', unsafe_allow_html=True)
 
     st.write("---")
     
-    # MENU INICIAL EM COLUNAS
+    # GRID DE CARDS (LAYOUT 2 COLUNAS)
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-container" style="--cor-loteria: {dados["cor"]};"><div class="card-title">{nome}</div></a>', unsafe_allow_html=True)
     
     st.write("---")
-    st.subheader("📂 Busca por Intervalo de Datas")
+    st.subheader("📂 Pesquisa por Intervalo")
     
-    # BUSCA POR INTERVALO
     c_b1, c_b2 = st.columns(2)
-    d_ini = c_b1.date_input("Início", value=None)
-    d_fim = c_b2.date_input("Fim", value=None)
+    d_ini = c_b1.date_input("De:", value=None)
+    d_fim = c_b2.date_input("Até:", value=None)
 
     if supabase:
         try:
@@ -101,18 +106,17 @@ def home():
             if d_ini and d_fim:
                 dados_db = [j for j in dados_db if d_ini.strftime("%Y-%m-%d") <= j['created_at'][:10] <= d_fim.strftime("%Y-%m-%d")]
             
-            if not dados_db: st.info("Nenhum jogo encontrado no período.")
-            else:
-                for item in dados_db[:10]:
-                    with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
-                        st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
-        except: st.error("Erro ao acessar histórico.")
+            for item in dados_db[:10]:
+                with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
+                    st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
+        except: st.error("Erro no histórico.")
 
 def gerador_loteria(nome, config):
     st.markdown(f'<h3 style="color:{config["cor"]};">🍀 {nome}</h3>', unsafe_allow_html=True)
-    if st.button("⬅️ Sair"): st.query_params.clear(); st.session_state.pagina = "Início"; st.rerun()
+    if st.button("⬅️ Sair"): 
+        st.query_params.clear(); st.session_state.pagina = "Início"; st.rerun()
 
-    aba_gerar, aba_fechamento = st.tabs(["🚀 Gerador Simples", "🛡️ Fechamentos Matemáticos"])
+    aba_gerar, aba_fechamento, aba_estatisticas = st.tabs(["🚀 Gerador", "🛡️ Fechamentos", "📊 Estatísticas"])
 
     with aba_gerar:
         c1, c2 = st.columns(2)
@@ -120,41 +124,57 @@ def gerador_loteria(nome, config):
             if st.button("🎲 Surpresinha", use_container_width=True):
                 st.session_state[f"sel_{nome}"] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
         with c2:
-            if st.button("📈 Mais Frequentes", use_container_width=True):
-                dfreq = buscar_resultado_api(config['api'])
-                if dfreq and 'dezenas' in dfreq:
-                    st.session_state[f"sel_{nome}"] = [f"{int(n):02d}" for n in dfreq['dezenas'][:config['min_sel']]]
-                else: st.warning("Dados indisponíveis.")
+            if st.button("📈 Frequentes", use_container_width=True):
+                df = buscar_resultado_api(config['api'])
+                if df and 'dezenas' in df: st.session_state[f"sel_{nome}"] = [f"{int(n):02d}" for n in df['dezenas'][:config['min_sel']]]
 
-        selecionados = st.segmented_control("Números:", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}")
+        selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
-        n_sel = len(selecionados) if selecionados else config['min_sel']
-        preco = PRECOS_BASE.get(nome, {}).get(n_sel, "Consulte")
-        st.metric("Custo Estimado", formata_dinheiro(preco) if isinstance(preco, float) else preco)
+        # PARAMETROS RESTAURADOS
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1: dez_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
+        with col_p2: 
+            tudo = st.checkbox("Gerar Todos")
+            q_max = st.number_input("Limite", 1, 1000000, 100, disabled=tudo)
+        with col_p3:
+            n_custo = len(selecionados) if selecionados else config['min_sel']
+            preco = PRECOS_BASE.get(nome, {}).get(n_custo, "Consulte")
+            st.metric("Preço Jogo", formata_dinheiro(preco) if isinstance(preco, float) else preco)
 
         if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
-            if len(selecionados) < config['min_sel']: st.error("Selecione mais números.")
+            if len(selecionados) < dez_jogo: st.error(f"Selecione no mínimo {dez_jogo} números.")
             else:
-                jogos = list(combinations([int(x) for x in selecionados], config['min_sel']))[:100]
-                st.session_state[f"jogos_{nome}"] = jogos
-                st.dataframe(pd.DataFrame(jogos), use_container_width=True)
-                if supabase and st.button("💾 Salvar"):
-                    supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Manual", "dezenas": jogos}).execute()
-                    st.toast("Salvo!")
-
-    with aba_fechamento:
-        st.subheader("🛡️ Fechamentos (Garantia)")
-        if len(selecionados) < config['min_sel'] + 2:
-            st.warning(f"Selecione pelo menos {config['min_sel'] + 2} números para um fechamento.")
-        else:
-            tipo_g = st.radio("Garantia desejada:", config['garantias'])
-            if st.button("💎 Gerar Fechamento Otimizado"):
                 n_int = sorted([int(x) for x in selecionados])
-                todos = list(combinations(n_int, config['min_sel']))
-                salto = 4 if "Quadra" in tipo_g or "11" in tipo_g else 7
-                reduzido = todos[::salto]
-                st.success(f"Gerado: {len(reduzido)} jogos com garantia de {tipo_g}.")
-                st.dataframe(pd.DataFrame(reduzido), use_container_width=True)
+                res = list(combinations(n_int, dez_jogo))
+                if not tudo: res = res[:q_max]
+                
+                st.session_state[f"jogos_{nome}"] = res
+                st.success(f"{len(res)} jogos gerados com sucesso!")
+                st.dataframe(pd.DataFrame(res), use_container_width=True)
+                
+                if supabase:
+                    if st.button("💾 Salvar Jogos Gerados"):
+                        supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Gerado", "dezenas": res}).execute()
+                        st.toast("✅ Salvo na Nuvem!")
+
+    # ABA DE FECHAMENTOS (RESTAURADA)
+    with aba_fechamento:
+        st.subheader("🛡️ Fechamento Matemático")
+        if len(selecionados) < dez_jogo + 2:
+            st.warning("Selecione mais números para criar um desdobramento.")
+        else:
+            tipo = st.radio("Garantia:", config['garantias'])
+            if st.button("💎 Criar Desdobramento"):
+                n_int = sorted([int(x) for x in selecionados])
+                comb = list(combinations(n_int, dez_jogo))
+                salto = 4 if "Quadra" in tipo or "11" in tipo else 7
+                res_f = comb[::salto]
+                st.info(f"Otimizado: {len(res_f)} jogos garantindo {tipo}.")
+                st.dataframe(pd.DataFrame(res_f), use_container_width=True)
+
+    with aba_estatisticas:
+        if selecionados:
+            st.bar_chart(pd.Series([int(n) % 10 for n in selecionados]).value_counts())
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início": home()

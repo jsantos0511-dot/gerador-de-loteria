@@ -55,42 +55,79 @@ p_atual = st.session_state.pagina
 cor_tema = TEMAS[p_atual]['cor'] if p_atual != "Início" else "#ffffff"
 cols_v = TEMAS[p_atual]['cols'] if p_atual != "Início" else 6
 
+# LOCALIZAÇÃO: Logo após as variáveis de navegação e antes das funções de lógica
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #0e1117; color: #ffffff; }}
-    .card-container {{
-        border: 2px solid var(--cor-loteria); border-radius: 12px; padding: 12px 8px;
-        text-align: center; background-color: #161b22; transition: all 0.2s;
-        cursor: pointer; text-decoration: none !important; display: block; margin-bottom: 12px;
+    
+    /* Grid de Cards */
+    .home-grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 30px;
     }}
-    .card-container:hover {{ transform: scale(1.02); box-shadow: 0 0 15px var(--cor-loteria); }}
-    .card-title {{ font-size: 17px; font-weight: bold; color: var(--cor-loteria); }}
-    button[role="option"][aria-selected="true"] {{ background-color: {cor_tema} !important; color: white !important; }}
-    div[data-testid="stSegmentedControl"] {{ display: grid !important; grid-template-columns: repeat({cols_v}, 1fr) !important; gap: 3px !important; }}
-    [data-testid="stSidebar"] {{ display: none; }}
-    footer {{visibility: hidden;}}
+    
+    .card-container {{
+        border: 2px solid var(--cor-loteria);
+        border-radius: 12px;
+        padding: 15px 10px;
+        text-align: center;
+        background-color: #161b22;
+        transition: all 0.2s ease;
+        text-decoration: none !important;
+        display: block;
+    }}
+    
+    .card-container:hover {{
+        transform: scale(1.03);
+        box-shadow: 0 0 15px var(--cor-loteria);
+        background-color: #1c2128;
+    }}
+    
+    .card-title {{
+        font-size: 18px;
+        font-weight: bold;
+        color: #ffffff;
+        margin-top: 5px;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- TELAS ---
+# LOCALIZAÇÃO: Procure por 'def home():' e substitua o bloco inteiro
 def home():
     st.markdown('<h2 style="text-align:center; margin-bottom:25px;">🍀 Portal Loterias Pro</h2>', unsafe_allow_html=True)
+    
     col1, col2 = st.columns(2)
+    
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
-        card_html = f'<a href="/?escolha={nome}" target="_self" class="card-container" style="--cor-loteria: {dados["cor"]};"><div style="font-size:22px;">🍀</div><div class="card-title">{nome}</div></a>'
+        
+        card_html = f"""
+        <a href="/?escolha={nome}" target="_self" class="card-container" style="--cor-loteria: {dados['cor']};">
+            <div style="font-size:24px;">🍀</div>
+            <div class="card-title">{nome}</div>
+        </a>
+        <div style="margin-bottom:15px;"></div>
+        """
         alvo.markdown(card_html, unsafe_allow_html=True)
     
-    st.divider()
-    st.subheader("📂 Meus Jogos Salvos (Nuvem)")
+    st.write("---")
+    st.subheader("📂 Últimos Jogos Salvos (Nuvem)")
+    
     if supabase:
         try:
             res_db = supabase.table("meus_jogos").select("*").order("created_at", desc=True).limit(5).execute()
-            for item in res_db.data:
-                with st.expander(f"📌 {item['loteria']} - {item['created_at'][:10]}"):
-                    st.write(f"Ref: {item['concurso']}")
-                    st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
-        except: st.info("Conecte o Supabase para ver seus jogos aqui.")
+            if res_db.data:
+                for item in res_db.data:
+                    with st.expander(f"📌 {item['loteria']} - {item['created_at'][:10]}"):
+                        st.caption(f"Ref: {item['concurso']}")
+                        st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
+            else:
+                st.info("Nenhum jogo salvo ainda.")
+        except:
+            st.warning("Verifique suas chaves do Supabase para carregar o histórico.")
 
 def gerador_loteria(nome, config):
     c_v, c_t = st.columns([1, 4])

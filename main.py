@@ -9,8 +9,8 @@ from supabase import create_client, Client
 
 # --- CONFIGURAÇÕES DO BANCO DE DADOS (SUPABASE) ---
 # Substitua pelos dados do seu projeto no Supabase
-SUPABASE_URL = "SUA_URL_AQUI"
-SUPABASE_KEY = "SUA_KEY_ANON_AQUI"
+SUPABASE_URL = "https://ryzcivhjohgtzixqflwo.supabase.co"
+SUPABASE_KEY = "sb_publishable_Mbx3FHs_VoprLY2e9d1QMQ_5309Bglr"
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)

@@ -135,17 +135,32 @@ def home():
         alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-link"><div class="card-container" style="--cor-loteria: {dados["cor"]};"><b style="font-size:16px;">{nome}</b></div></a>', unsafe_allow_html=True)
     
     st.write("---")
-    st.markdown('<div class="sub-title">📂 Histórico (Últimos 15 dias)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">📂 Histórico de Pesquisa</div>', unsafe_allow_html=True)
+    
+    # --- REINCLUSÃO DO INTERVALO DE PESQUISA ---
+    c1, c2 = st.columns(2)
+    d_ini = c1.date_input("Início:", value=None)
+    d_fim = c2.date_input("Fim:", value=None)
+
     if supabase:
         try:
             query = supabase.table("meus_jogos").select("*").order("created_at", desc=True)
             dados_db = query.execute().data
-            corte = (datetime.now() - timedelta(days=15)).strftime("%Y-%m-%d")
-            dados_db = [j for j in dados_db if j['created_at'][:10] >= corte]
-            for item in dados_db:
-                with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
-                    st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
-        except: pass
+            
+            # Filtro por intervalo (se selecionado) ou últimos 15 dias (padrão)
+            if d_ini and d_fim:
+                dados_db = [j for j in dados_db if d_ini.strftime("%Y-%m-%d") <= j['created_at'][:10] <= d_fim.strftime("%Y-%m-%d")]
+            else:
+                corte = (datetime.now() - timedelta(days=15)).strftime("%Y-%m-%d")
+                dados_db = [j for j in dados_db if j['created_at'][:10] >= corte]
+
+            if not dados_db:
+                st.info("Nenhum jogo encontrado para o período.")
+            else:
+                for item in dados_db:
+                    with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
+                        st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
+        except: st.error("Erro ao carregar banco de dados.")
 
 def gerador_loteria(nome, config):
     st.markdown(f'<div class="main-title" style="color:{config["cor"]};">🍀 {nome}</div>', unsafe_allow_html=True)
@@ -199,7 +214,7 @@ def gerador_loteria(nome, config):
         tipo = st.radio("Objetivo:", config['garantias'])
         if st.button("💎 Gerar Fechamento"):
             comb = list(combinations(sorted([int(x) for x in selecionados]), dez_jogo))
-            res_f = comb[::5] # Simulação de redução
+            res_f = comb[::5] # Simulação de redução de custo
             st.dataframe(pd.DataFrame(res_f), use_container_width=True)
 
     with aba_conferir:

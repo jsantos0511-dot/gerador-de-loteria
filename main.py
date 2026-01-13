@@ -49,15 +49,29 @@ def buscar_resultado_api(loteria_slug):
         return response.json() if response.status_code == 200 else None
     except: return None
 
-# --- CSS E LAYOUT ---
+def aplicar_filtros(combos, f_seq, f_fin, f_par, max_p, dez_jogo, limite, tudo):
+    res = []
+    for c in combos:
+        j = list(c)
+        if f_seq and any(j[i+1] == j[i]+1 for i in range(len(j)-1)): continue
+        if f_fin and any([n % 10 for n in j].count(f) > 4 for f in [n % 10 for n in j]): continue
+        if f_par:
+            p = len([n for n in j if n % 2 == 0])
+            if p > max_p or (dez_jogo - p) > max_p: continue
+        res.append(j)
+        if not tudo and len(res) >= limite: break
+    return res
+
+# --- ESTILIZAÇÃO CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #ffffff; }
     .card-container { 
         border: 2px solid var(--cor-loteria); border-radius: 12px; padding: 15px; 
         text-align: center; background-color: #161b22; display: block; 
-        margin-bottom: 12px; text-decoration: none !important; 
+        margin-bottom: 12px; text-decoration: none !important; transition: 0.3s;
     }
+    .card-container:hover { transform: scale(1.02); box-shadow: 0 0 10px var(--cor-loteria); }
     .card-title { font-size: 18px; font-weight: bold; color: #ffffff; }
     .notificacao { 
         padding: 10px; border-radius: 8px; background: #1c2128; 
@@ -66,16 +80,16 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGICA DE NAVEGAÇÃO ---
-if "pagina" not in st.session_state:
-    st.session_state.pagina = st.query_params.get("escolha", "Início")
+# --- NAVEGAÇÃO ---
+params = st.query_params
+pagina_atual = params.get("escolha", "Início")
 
 # --- TELAS ---
 def home():
     st.markdown('<h2 style="text-align:center;">🍀 Portal Loterias Pro</h2>', unsafe_allow_html=True)
     
     # 🔔 NOTIFICAÇÕES (FORMATO CORRIGIDO)
-    st.write("🔔 **Acumulados:**")
+    st.write("🔔 **Notificações e Acumulados:**")
     loterias_check = ["megasena", "lotofacil", "quina"]
     cols_n = st.columns(3)
     for idx, slug in enumerate(loterias_check):
@@ -86,15 +100,16 @@ def home():
 
     st.write("---")
     
-    # GRID DE CARDS (LAYOUT 2 COLUNAS)
+    # GRID DE CARDS
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
         alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-container" style="--cor-loteria: {dados["cor"]};"><div class="card-title">{nome}</div></a>', unsafe_allow_html=True)
     
     st.write("---")
-    st.subheader("📂 Pesquisa por Intervalo")
+    st.subheader("📂 Pesquisa por Intervalo de Datas")
     
+    # INTERVALO DE BUSCA
     c_b1, c_b2 = st.columns(2)
     d_ini = c_b1.date_input("De:", value=None)
     d_fim = c_b2.date_input("Até:", value=None)
@@ -114,9 +129,9 @@ def home():
 def gerador_loteria(nome, config):
     st.markdown(f'<h3 style="color:{config["cor"]};">🍀 {nome}</h3>', unsafe_allow_html=True)
     if st.button("⬅️ Sair"): 
-        st.query_params.clear(); st.session_state.pagina = "Início"; st.rerun()
+        st.query_params.clear(); st.rerun()
 
-    aba_gerar, aba_fechamento, aba_estatisticas = st.tabs(["🚀 Gerador", "🛡️ Fechamentos", "📊 Estatísticas"])
+    aba_gerar, aba_fechamento, aba_estatisticas = st.tabs(["🚀 Gerador & Filtros", "🛡️ Fechamentos", "📊 Estatísticas"])
 
     with aba_gerar:
         c1, c2 = st.columns(2)
@@ -128,54 +143,63 @@ def gerador_loteria(nome, config):
                 df = buscar_resultado_api(config['api'])
                 if df and 'dezenas' in df: st.session_state[f"sel_{nome}"] = [f"{int(n):02d}" for n in df['dezenas'][:config['min_sel']]]
 
+        # VOLANTE DE SELEÇÃO
         selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
-        # PARAMETROS RESTAURADOS
+        # PARAMETROS DE GERAÇÃO
         col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: dez_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
+        with col_p1: dez_jogo = st.number_input("Dezenas/Jogo", config['min_sel'], config['total'], config['min_sel'])
         with col_p2: 
-            tudo = st.checkbox("Gerar Todos")
-            q_max = st.number_input("Limite", 1, 1000000, 100, disabled=tudo)
+            tudo = st.checkbox("Gerar Todas as Combin.")
+            q_max = st.number_input("Limite de Jogos", 1, 1000000, 100, disabled=tudo)
         with col_p3:
             n_custo = len(selecionados) if selecionados else config['min_sel']
             preco = PRECOS_BASE.get(nome, {}).get(n_custo, "Consulte")
-            st.metric("Preço Jogo", formata_dinheiro(preco) if isinstance(preco, float) else preco)
+            st.metric("Custo da Aposta", formata_dinheiro(preco) if isinstance(preco, float) else preco)
 
-        if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
+        # FILTROS INTELIGENTES (RECUPERADOS)
+        with st.expander("🛠️ Filtros de Filtragem Inteligente", expanded=False):
+            f_s = st.checkbox("🚫 Bloquear sequências (ex: 01, 02)")
+            f_f = st.checkbox("🚫 Limitar números com mesmo final")
+            f_p = st.checkbox("⚖️ Equilibrar Pares/Ímpares")
+            m_p = st.slider("Máximo de números Pares", 0, dez_jogo, dez_jogo // 2) if f_p else dez_jogo
+
+        if st.button("🚀 GERAR JOGOS COM FILTROS", type="primary", use_container_width=True):
             if len(selecionados) < dez_jogo: st.error(f"Selecione no mínimo {dez_jogo} números.")
             else:
                 n_int = sorted([int(x) for x in selecionados])
-                res = list(combinations(n_int, dez_jogo))
-                if not tudo: res = res[:q_max]
+                comb_puras = combinations(n_int, dez_jogo)
+                res = aplicar_filtros(comb_puras, f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
                 
                 st.session_state[f"jogos_{nome}"] = res
-                st.success(f"{len(res)} jogos gerados com sucesso!")
+                st.success(f"Sucesso! {len(res)} jogos gerados.")
                 st.dataframe(pd.DataFrame(res), use_container_width=True)
                 
-                if supabase:
-                    if st.button("💾 Salvar Jogos Gerados"):
-                        supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Gerado", "dezenas": res}).execute()
-                        st.toast("✅ Salvo na Nuvem!")
+                if supabase and len(res) > 0:
+                    if st.button("💾 Salvar Resultados"):
+                        supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Filtro Ativo", "dezenas": res}).execute()
+                        st.toast("✅ Jogos salvos com sucesso!")
 
-    # ABA DE FECHAMENTOS (RESTAURADA)
     with aba_fechamento:
         st.subheader("🛡️ Fechamento Matemático")
         if len(selecionados) < dez_jogo + 2:
-            st.warning("Selecione mais números para criar um desdobramento.")
+            st.warning("Selecione mais números no volante para criar um desdobramento.")
         else:
-            tipo = st.radio("Garantia:", config['garantias'])
-            if st.button("💎 Criar Desdobramento"):
+            tipo = st.radio("Objetivo da Garantia:", config['garantias'])
+            if st.button("💎 Gerar Desdobramento"):
                 n_int = sorted([int(x) for x in selecionados])
                 comb = list(combinations(n_int, dez_jogo))
-                salto = 4 if "Quadra" in tipo or "11" in tipo else 7
+                salto = 5 if "Quadra" in tipo or "11" in tipo else 8
                 res_f = comb[::salto]
-                st.info(f"Otimizado: {len(res_f)} jogos garantindo {tipo}.")
+                st.info(f"Otimizado: {len(res_f)} jogos selecionados para garantir {tipo}.")
                 st.dataframe(pd.DataFrame(res_f), use_container_width=True)
 
     with aba_estatisticas:
         if selecionados:
-            st.bar_chart(pd.Series([int(n) % 10 for n in selecionados]).value_counts())
+            st.subheader("📊 Distribuição dos Números")
+            nums = [int(n) for n in selecionados]
+            st.bar_chart(pd.Series([n % 10 for n in nums]).value_counts().sort_index())
 
 # --- EXECUÇÃO ---
-if st.session_state.pagina == "Início": home()
-else: gerador_loteria(st.session_state.pagina, TEMAS[st.session_state.pagina])
+if pagina_atual == "Início": home()
+else: gerador_loteria(pagina_atual, TEMAS[pagina_atual])

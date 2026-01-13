@@ -62,19 +62,29 @@ def aplicar_filtros(combos, f_seq, f_fin, f_par, max_p, dez_jogo, limite, tudo):
         if not tudo and len(res) >= limite: break
     return res
 
-# --- ESTILIZAÇÃO CSS (FOCO EM ESPAÇO E NEON) ---
+# --- ESTILIZAÇÃO CSS CORRIGIDA ---
 st.markdown("""
     <style>
-    /* Remover espaço em branco no topo */
-    .block-container { padding-top: 1rem !important; }
+    /* Ajuste fino do container para não cortar o título */
+    .block-container { padding-top: 2rem !important; }
     .stApp { background-color: #0e1117; color: #ffffff; }
     
-    .main-title { text-align: center; font-size: 1.75rem; font-weight: bold; margin-top: -20px; margin-bottom: 1rem; color: #ffffff; }
-    .sub-title { font-size: 1.2rem !important; font-weight: bold; margin-top: 10px; margin-bottom: 10px; }
+    /* Título com margem ajustada para visibilidade */
+    .main-title { 
+        text-align: center; 
+        font-size: 1.75rem; 
+        font-weight: bold; 
+        margin-top: -15px; 
+        margin-bottom: 1rem; 
+        color: #ffffff;
+        display: block;
+    }
+    
+    .sub-title { font-size: 1.1rem !important; font-weight: bold; margin-top: 10px; margin-bottom: 8px; }
     
     .card-link { text-decoration: none !important; color: white !important; }
     
-    /* Menu com Efeito Neon Restaurado */
+    /* Efeito Neon Mantido */
     .card-container { 
         border: 2px solid var(--cor-loteria); 
         border-radius: 10px; 
@@ -89,7 +99,7 @@ st.markdown("""
     
     .card-container:hover { 
         box-shadow: 0 0 15px var(--cor-loteria), 0 0 5px var(--cor-loteria) inset;
-        transform: translateY(-3px);
+        transform: translateY(-2px);
     }
     
     .notificacao { 
@@ -134,10 +144,10 @@ def home():
         alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-link"><div class="card-container" style="--cor-loteria: {dados["cor"]};"><b style="font-size:16px;">{nome}</b></div></a>', unsafe_allow_html=True)
     
     st.write("---")
-    st.markdown('<div class="sub-title">📂 Histórico (15 dias)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">📂 Histórico (Últimos 15 dias)</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    d_ini = c1.date_input("Início:", value=None)
-    d_fim = c2.date_input("Fim:", value=None)
+    d_ini = c1.date_input("De:", value=None)
+    d_fim = c2.date_input("Até:", value=None)
 
     if supabase:
         try:
@@ -155,7 +165,7 @@ def home():
         except: pass
 
 def gerador_loteria(nome, config):
-    st.markdown(f'<h3 style="color:{config["cor"]}; text-align:center; margin-top:-20px;">🍀 {nome}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<div class="main-title" style="color:{config["cor"]};">🍀 {nome}</div>', unsafe_allow_html=True)
     if st.button("⬅️ Voltar ao Início"): st.query_params.clear(); st.rerun()
 
     aba_gerar, aba_fechamento, aba_conferir = st.tabs(["🚀 Gerador", "🛡️ Fechamentos", "✅ Conferir"])
@@ -176,47 +186,47 @@ def gerador_loteria(nome, config):
         selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
         col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: dez_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
+        with col_p1: dez_jogo = st.number_input("Números", config['min_sel'], config['total'], config['min_sel'])
         with col_p2: 
-            tudo = st.checkbox("Gerar Todas")
+            tudo = st.checkbox("Gerar Tudo")
             q_max = st.number_input("Limite", 1, 1000000, 100, disabled=tudo)
         with col_p3:
             n_atual = len(selecionados) if selecionados else config['min_sel']
             preco = PRECOS_BASE.get(nome, {}).get(n_atual, "Consulte")
             st.metric("Custo", formata_dinheiro(preco) if isinstance(preco, float) else preco)
 
-        if st.button("🚀 GERAR E SALVAR", type="primary", use_container_width=True):
-            if len(selecionados) < dez_jogo: st.error("Selecione mais números.")
+        if st.button("🚀 GERAR E SALVAR JOGOS", type="primary", use_container_width=True):
+            if len(selecionados) < dez_jogo: st.error("Selecione mais dezenas.")
             else:
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), False, False, False, 0, dez_jogo, q_max, tudo)
                 st.dataframe(pd.DataFrame(res), use_container_width=True)
                 if supabase:
                     supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Manual", "dezenas": res}).execute()
-                    st.toast("✅ Salvo!")
+                    st.toast("✅ Salvo no banco!")
 
     with aba_conferir:
         st.markdown('<div class="sub-title">✅ Conferência por Regra CAIXA</div>', unsafe_allow_html=True)
         res_oficial = buscar_resultado_api(config['api'])
         if res_oficial:
             dt_sorteio = datetime.strptime(res_oficial['data'], "%d/%m/%Y").date()
-            dt_sorteio_anterior = dt_sorteio - timedelta(days=4)
+            dt_sorteio_previo = dt_sorteio - timedelta(days=5)
             
-            st.info(f"Concurso **{res_oficial['concurso']}** ({res_oficial['data']})")
+            st.info(f"Concurso **{res_oficial['concurso']}** - {res_oficial['data']}")
             html_bolas = "".join([f'<div class="resultado-bola" style="background-color:{config["cor"]}">{n:02d}</div>' for n in [int(n) for n in res_oficial['dezenas']]])
             st.markdown(html_bolas, unsafe_allow_html=True)
 
             if supabase:
                 jogos_db = supabase.table("meus_jogos").select("*").eq("loteria", nome).execute().data
-                jogos_validos = [j for j in jogos_db if dt_sorteio_anterior.strftime("%Y-%m-%d") < j['created_at'][:10] <= dt_sorteio.strftime("%Y-%m-%d")]
+                # Regra: Criado até a data do sorteio, mas após o sorteio anterior
+                jogos_v = [j for j in jogos_db if dt_sorteio_previo.strftime("%Y-%m-%d") < j['created_at'][:10] <= dt_sorteio.strftime("%Y-%m-%d")]
 
-                if jogos_validos:
+                if jogos_v:
                     oficiais = [int(n) for n in res_oficial['dezenas']]
-                    for bloco in jogos_validos:
+                    for bloco in jogos_v:
                         with st.expander(f"Aposta em: {formata_data_br(bloco['created_at'])}"):
-                            results = [{"Jogo": j, "Acertos": len(set(j) & set(oficiais))} for j in bloco['dezenas']]
-                            st.dataframe(pd.DataFrame(results).sort_values("Acertos", ascending=False), use_container_width=True)
-                else:
-                    st.warning("Sem jogos para este concurso.")
+                            res_lista = [{"Jogo": j, "Acertos": len(set(j) & set(oficiais))} for j in bloco['dezenas']]
+                            st.dataframe(pd.DataFrame(res_lista).sort_values("Acertos", ascending=False), use_container_width=True)
+                else: st.warning("Nenhum jogo encontrado para este sorteio.")
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início": home()

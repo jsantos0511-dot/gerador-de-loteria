@@ -77,23 +77,23 @@ st.markdown("""
         padding: 10px; border-radius: 8px; background: #1c2128; 
         border-left: 5px solid #ffcc00; margin-bottom: 8px; font-size: 12px; 
     }
+    .resultado-bola {
+        display: inline-block; width: 35px; height: 35px; line-height: 35px;
+        background-color: #209869; color: white; border-radius: 50%;
+        text-align: center; margin: 3px; font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- SISTEMA DE NAVEGAÇÃO ---
-# Prioriza query_params para evitar que o menu quebre ao atualizar a página
 params = st.query_params
-if "escolha" in params:
-    st.session_state.pagina = params["escolha"]
-else:
-    st.session_state.pagina = "Início"
+st.session_state.pagina = params.get("escolha", "Início")
 
 # --- TELAS ---
 def home():
-    st.markdown('<h1 style="text-align:center;">🍀 Portal Loterias Pro</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="text-align:center;">🍀 Gerador de Jogos</h1>', unsafe_allow_html=True)
     
-    # 🔔 NOTIFICAÇÕES (Múltiplas loterias)
-    st.write("🔔 **Jogos Acumulados Hoje:**")
+    st.write("🔔 **Acumulados de Hoje:**")
     loterias_check = ["megasena", "lotofacil", "quina", "duplasena"]
     cols_n = st.columns(len(loterias_check))
     for idx, slug in enumerate(loterias_check):
@@ -104,23 +104,16 @@ def home():
 
     st.write("---")
     
-    # MENU INICIAL EM COLUNAS
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
-        alvo.markdown(f"""
-            <a href="/?escolha={nome}" target="_self" class="card-link">
-                <div class="card-container" style="--cor-loteria: {dados['cor']};">
-                    <b style="font-size:20px;">{nome}</b>
-                </div>
-            </a>
-        """, unsafe_allow_html=True)
+        alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-link"><div class="card-container" style="--cor-loteria: {dados["cor"]};"><b style="font-size:18px;">{nome}</b></div></a>', unsafe_allow_html=True)
     
     st.write("---")
-    st.subheader("📂 Histórico por Período")
+    st.subheader("📂 Pesquisa por Intervalo")
     c1, c2 = st.columns(2)
-    d_ini = c1.date_input("Data Inicial", value=None)
-    d_fim = c2.date_input("Data Final", value=None)
+    d_ini = c1.date_input("De", value=None)
+    d_fim = c2.date_input("Até", value=None)
 
     if supabase:
         try:
@@ -128,20 +121,16 @@ def home():
             dados_db = query.execute().data
             if d_ini and d_fim:
                 dados_db = [j for j in dados_db if d_ini.strftime("%Y-%m-%d") <= j['created_at'][:10] <= d_fim.strftime("%Y-%m-%d")]
-            
-            for item in dados_db[:8]:
+            for item in dados_db[:5]:
                 with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
                     st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
-        except: st.error("Erro ao carregar banco de dados.")
+        except: st.error("Erro no histórico.")
 
 def gerador_loteria(nome, config):
     st.markdown(f'<h2 style="color:{config["cor"]};">🍀 {nome}</h2>', unsafe_allow_html=True)
-    if st.button("⬅️ Voltar ao Início"):
-        st.query_params.clear()
-        st.session_state.pagina = "Início"
-        st.rerun()
+    if st.button("⬅️ Sair"): st.query_params.clear(); st.rerun()
 
-    aba_gerar, aba_fechamento = st.tabs(["🚀 Gerador & Filtros", "🛡️ Fechamentos"])
+    aba_gerar, aba_fechamento, aba_conferir = st.tabs(["🚀 Gerador & Filtros", "🛡️ Fechamentos", "✅ Conferir Jogos"])
 
     with aba_gerar:
         c1, c2, c3 = st.columns(3)
@@ -153,54 +142,69 @@ def gerador_loteria(nome, config):
                 df = buscar_resultado_api(config['api'])
                 if df and 'dezenas' in df: st.session_state[f"sel_{nome}"] = [f"{int(n):02d}" for n in df['dezenas'][:config['min_sel']]]
         with c3:
-            # BOTÃO DE LIMPAR TUDO
-            if st.button("🗑️ Limpar Tudo", use_container_width=True):
+            if st.button("🗑️ Limpar", use_container_width=True):
                 st.session_state[f"sel_{nome}"] = []
                 st.rerun()
 
         selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
         col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: dez_jogo = st.number_input("Números p/ Jogo", config['min_sel'], config['total'], config['min_sel'])
+        with col_p1: dez_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
         with col_p2: 
             tudo = st.checkbox("Gerar Todos")
             q_max = st.number_input("Limite", 1, 1000000, 100, disabled=tudo)
         with col_p3:
             n_atual = len(selecionados) if selecionados else config['min_sel']
             preco = PRECOS_BASE.get(nome, {}).get(n_atual, "Consulte")
-            st.metric("Custo da Aposta", formata_dinheiro(preco) if isinstance(preco, float) else preco)
+            st.metric("Preço Jogo", formata_dinheiro(preco) if isinstance(preco, float) else preco)
 
-        with st.expander("🛠️ Filtros de Filtragem"):
-            f_s = st.checkbox("Remover sequências")
-            f_f = st.checkbox("Limitar finais iguais")
-            f_p = st.checkbox("Filtrar Par/Ímpar")
-            m_p = st.slider("Máximo Pares", 0, dez_jogo, dez_jogo // 2) if f_p else dez_jogo
+        with st.expander("🛠️ Filtros"):
+            f_s = st.checkbox("Sem sequências")
+            f_f = st.checkbox("Limitar finais")
+            f_p = st.checkbox("Pares/Ímpares")
+            m_p = st.slider("Máx. Pares", 0, dez_jogo, dez_jogo // 2) if f_p else dez_jogo
 
         if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
-            if len(selecionados) < dez_jogo: st.error("Selecione mais números!")
+            if len(selecionados) < dez_jogo: st.error("Selecione mais números.")
             else:
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
+                st.session_state[f"ultimos_jogos_{nome}"] = res
                 st.success(f"{len(res)} jogos gerados!")
                 st.dataframe(pd.DataFrame(res), use_container_width=True)
-                if supabase and len(res) > 0:
-                    if st.button("💾 Salvar na Nuvem"):
-                        supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Manual", "dezenas": res}).execute()
-                        st.toast("✅ Salvo!")
 
     with aba_fechamento:
-        st.subheader("🛡️ Fechamentos Matemáticos")
-        if len(selecionados) < dez_jogo + 2: st.warning("Selecione mais números no volante.")
-        else:
-            tipo = st.radio("Garantia:", config['garantias'])
-            if st.button("💎 Gerar Fechamento"):
-                comb = list(combinations(sorted([int(x) for x in selecionados]), dez_jogo))
-                salto = 4 if "Quadra" in tipo or "11" in tipo else 8
-                res_f = comb[::salto]
-                st.info(f"Otimizado: {len(res_f)} jogos para {tipo}.")
-                st.dataframe(pd.DataFrame(res_f), use_container_width=True)
+        st.subheader("🛡️ Fechamento Matemático")
+        tipo = st.radio("Objetivo:", config['garantias'])
+        if st.button("💎 Gerar"):
+            comb = list(combinations(sorted([int(x) for x in selecionados]), dez_jogo))
+            res_f = comb[::5]
+            st.dataframe(pd.DataFrame(res_f), use_container_width=True)
 
-# --- EXECUÇÃO FINAL ---
-if st.session_state.pagina == "Início":
-    home()
-else:
-    gerador_loteria(st.session_state.pagina, TEMAS[st.session_state.pagina])
+    # --- ABA DE CONFERÊNCIA RESTAURADA ---
+    with aba_conferir:
+        st.subheader("✅ Conferência com o Último Resultado")
+        res_oficial = buscar_resultado_api(config['api'])
+        if res_oficial:
+            dezenas_oficiais = [int(n) for n in res_oficial['dezenas']]
+            st.write(f"Concurso: **{res_oficial['concurso']}** ({res_oficial['data']})")
+            
+            html_bolas = "".join([f'<div class="resultado-bola" style="background-color:{config["cor"]}">{n:02d}</div>' for n in dezenas_oficiais])
+            st.markdown(html_bolas, unsafe_allow_html=True)
+            
+            jogos_para_conferir = st.session_state.get(f"ultimos_jogos_{nome}", [])
+            if jogos_para_conferir:
+                resultados = []
+                for j in jogos_para_conferir:
+                    acertos = len(set(j) & set(dezenas_oficiais))
+                    resultados.append({"Jogo": j, "Acertos": acertos})
+                
+                df_res = pd.DataFrame(resultados).sort_values(by="Acertos", ascending=False)
+                st.dataframe(df_res, use_container_width=True)
+            else:
+                st.info("Gere jogos na primeira aba para conferir aqui.")
+        else:
+            st.warning("Não foi possível carregar o resultado oficial agora.")
+
+# --- EXECUÇÃO ---
+if st.session_state.pagina == "Início": home()
+else: gerador_loteria(st.session_state.pagina, TEMAS[st.session_state.pagina])

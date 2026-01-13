@@ -62,20 +62,48 @@ def aplicar_filtros(combos, f_seq, f_fin, f_par, max_p, dez_jogo, limite, tudo):
         if not tudo and len(res) >= limite: break
     return res
 
-# --- ESTILIZAÇÃO CSS ---
+# --- ESTILIZAÇÃO CSS OTIMIZADA ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #ffffff; }
-    .card-container { 
-        border: 2px solid var(--cor-loteria); border-radius: 12px; padding: 20px; 
-        text-align: center; background-color: #161b22; margin-bottom: 15px; 
-        cursor: pointer; text-decoration: none !important; display: block;
+    
+    /* Título reduzido em 40% (aprox 1.5rem em vez de 2.5rem) */
+    .main-title { 
+        text-align: center; 
+        font-size: 1.5rem; 
+        font-weight: bold; 
+        margin-bottom: 1rem;
     }
-    .notificacao { padding: 10px; border-radius: 8px; background: #1c2128; border-left: 5px solid #ffcc00; margin-bottom: 8px; font-size: 12px; }
+    
+    /* Remoção de sublinhado e otimização de espaço nos cards */
+    .card-link { text-decoration: none !important; color: white !important; }
+    .card-container { 
+        border: 1px solid var(--cor-loteria); 
+        border-radius: 8px; 
+        padding: 12px; 
+        text-align: center; 
+        background-color: #161b22; 
+        margin-bottom: 10px; 
+        cursor: pointer; 
+        display: block;
+        transition: 0.2s;
+    }
+    .card-container:hover { background-color: #1c2128; }
+    
+    /* Notificações mais compactas */
+    .notificacao { 
+        padding: 8px; 
+        border-radius: 6px; 
+        background: #1c2128; 
+        border-left: 4px solid #ffcc00; 
+        margin-bottom: 5px; 
+        font-size: 0.75rem; 
+    }
+    
     .resultado-bola {
-        display: inline-block; width: 35px; height: 35px; line-height: 35px;
+        display: inline-block; width: 32px; height: 32px; line-height: 32px;
         background-color: #209869; color: white; border-radius: 50%;
-        text-align: center; margin: 3px; font-weight: bold; border: 1px solid white;
+        text-align: center; margin: 2px; font-weight: bold; font-size: 0.85rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -86,9 +114,9 @@ st.session_state.pagina = params.get("escolha", "Início")
 
 # --- TELAS ---
 def home():
-    st.markdown('<h1 style="text-align:center;">🍀 Gerador de Jogos</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🍀 Gerador de Jogos</div>', unsafe_allow_html=True)
     
-    st.write("🔔 **Jogos Acumulados Hoje:**")
+    st.write("🔔 **Acumulados:**")
     loterias_check = ["megasena", "lotofacil", "quina", "duplasena"]
     cols_n = st.columns(len(loterias_check))
     for idx, slug in enumerate(loterias_check):
@@ -102,13 +130,13 @@ def home():
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
-        alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-link"><div class="card-container" style="--cor-loteria: {dados["cor"]};"><b style="font-size:18px; color:white;">{nome}</b></div></a>', unsafe_allow_html=True)
+        alvo.markdown(f'<a href="/?escolha={nome}" target="_self" class="card-link"><div class="card-container" style="--cor-loteria: {dados["cor"]};"><b style="font-size:16px;">{nome}</b></div></a>', unsafe_allow_html=True)
     
     st.write("---")
-    st.subheader("📂 Pesquisa por Intervalo de Datas")
+    st.subheader("📂 Pesquisa por Intervalo")
     c1, c2 = st.columns(2)
-    d_ini = c1.date_input("De", value=None)
-    d_fim = c2.date_input("Até", value=None)
+    d_ini = c1.date_input("Início", value=None)
+    d_fim = c2.date_input("Fim", value=None)
 
     if supabase:
         try:
@@ -122,15 +150,15 @@ def home():
         except: st.error("Erro no histórico.")
 
 def gerador_loteria(nome, config):
-    st.markdown(f'<h2 style="color:{config["cor"]};">🍀 {nome}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h3 style="color:{config["cor"]}; text-align:center;">🍀 {nome}</h3>', unsafe_allow_html=True)
     if st.button("⬅️ Sair"): st.query_params.clear(); st.rerun()
 
-    aba_gerar, aba_fechamento, aba_conferir = st.tabs(["🚀 Gerador & Filtros", "🛡️ Fechamentos", "✅ Conferir (Histórico)"])
+    aba_gerar, aba_fechamento, aba_conferir = st.tabs(["🚀 Gerador", "🛡️ Fechamentos", "✅ Conferir"])
 
     with aba_gerar:
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("🎲 Surpresinha", use_container_width=True):
+            if st.button("🎲 Surpresa", use_container_width=True):
                 st.session_state[f"sel_{nome}"] = [f"{i:02d}" for i in random.sample(range(1, config['total'] + 1), config['min_sel'])]
         with c2:
             if st.button("📈 Frequentes", use_container_width=True):
@@ -140,7 +168,7 @@ def gerador_loteria(nome, config):
             if st.button("🗑️ Limpar", use_container_width=True):
                 st.session_state[f"sel_{nome}"] = []; st.rerun()
 
-        selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
+        selecionados = st.segmented_control("Números:", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
         col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1: dez_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
@@ -150,15 +178,15 @@ def gerador_loteria(nome, config):
         with col_p3:
             n_atual = len(selecionados) if selecionados else config['min_sel']
             preco = PRECOS_BASE.get(nome, {}).get(n_atual, "Consulte")
-            st.metric("Preço Jogo", formata_dinheiro(preco) if isinstance(preco, float) else preco)
+            st.metric("Custo", formata_dinheiro(preco) if isinstance(preco, float) else preco)
 
         with st.expander("🛠️ Filtros Inteligentes"):
             f_s = st.checkbox("Sem sequências")
             f_f = st.checkbox("Limitar finais")
-            f_p = st.checkbox("Pares/Ímpares")
-            m_p = st.slider("Máx. Pares", 0, dez_jogo, dez_jogo // 2) if f_p else dez_jogo
+            f_p = st.checkbox("Par/Ímpar")
+            m_p = st.slider("Máx Pares", 0, dez_jogo, dez_jogo // 2) if f_p else dez_jogo
 
-        if st.button("🚀 GERAR E SALVAR JOGOS", type="primary", use_container_width=True):
+        if st.button("🚀 GERAR E SALVAR", type="primary", use_container_width=True):
             if len(selecionados) < dez_jogo: st.error("Selecione mais números.")
             else:
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
@@ -166,50 +194,44 @@ def gerador_loteria(nome, config):
                 st.dataframe(pd.DataFrame(res), use_container_width=True)
                 if supabase and len(res) > 0:
                     supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Manual", "dezenas": res}).execute()
-                    st.toast("✅ Salvo no banco de dados!")
+                    st.toast("✅ Salvo!")
 
     with aba_fechamento:
         st.subheader("🛡️ Fechamento Matemático")
         tipo = st.radio("Objetivo:", config['garantias'])
-        if st.button("💎 Gerar Fechamento"):
+        if st.button("💎 Gerar"):
             comb = list(combinations(sorted([int(x) for x in selecionados]), dez_jogo))
             res_f = comb[::5]
             st.dataframe(pd.DataFrame(res_f), use_container_width=True)
 
-    # --- ABA DE CONFERÊNCIA POR DATA ---
     with aba_conferir:
-        st.subheader("✅ Conferência Inteligente")
+        st.subheader("✅ Conferência por Proximidade")
         res_oficial = buscar_resultado_api(config['api'])
         if res_oficial:
             dt_sorteio = datetime.strptime(res_oficial['data'], "%d/%m/%Y").date()
-            st.info(f"Último Sorteio: Concurso **{res_oficial['concurso']}** em **{res_oficial['data']}**")
+            st.info(f"Último: Concurso **{res_oficial['concurso']}** em **{res_oficial['data']}**")
             
             html_bolas = "".join([f'<div class="resultado-bola" style="background-color:{config["cor"]}">{n:02d}</div>' for n in [int(n) for n in res_oficial['dezenas']]])
             st.markdown(html_bolas, unsafe_allow_html=True)
 
             if supabase:
-                # Busca jogos salvos no banco nos últimos 7 dias da data do sorteio
                 dt_limite_inf = (dt_sorteio - timedelta(days=7)).strftime("%Y-%m-%d")
                 dt_limite_sup = dt_sorteio.strftime("%Y-%m-%d")
                 
                 jogos_db = supabase.table("meus_jogos").select("*").eq("loteria", nome).execute().data
-                # Filtra apenas jogos criados próximos à data do sorteio
                 jogos_validos = [j for j in jogos_db if dt_limite_inf <= j['created_at'][:10] <= dt_limite_sup]
 
                 if jogos_validos:
-                    st.write(f"Encontrados **{len(jogos_validos)}** blocos de jogos salvos para este período.")
                     oficiais = [int(n) for n in res_oficial['dezenas']]
                     for bloco in jogos_validos:
-                        with st.expander(f"Conferir jogos salvos em: {formata_data_br(bloco['created_at'])}"):
+                        with st.expander(f"Jogos salvos em: {formata_data_br(bloco['created_at'])}"):
                             results = []
                             for j in bloco['dezenas']:
                                 acertos = len(set(j) & set(oficiais))
                                 results.append({"Jogo": j, "Acertos": acertos})
                             st.dataframe(pd.DataFrame(results).sort_values("Acertos", ascending=False), use_container_width=True)
                 else:
-                    st.warning("Não encontramos jogos salvos no banco de dados nas datas próximas a este sorteio.")
-        else:
-            st.error("Erro ao carregar dados da CAIXA.")
+                    st.warning("Sem jogos salvos próximos a esta data.")
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início": home()

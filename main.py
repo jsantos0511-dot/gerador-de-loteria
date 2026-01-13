@@ -10,10 +10,14 @@ from datetime import datetime
 SUPABASE_URL = "https://ryzcivhjohgtzixqflwo.supabase.co"
 SUPABASE_KEY = "sb_publishable_Mbx3FHs_VoprLY2e9d1QMQ_5309Bglr"
 
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except:
-    supabase = None
+@st.cache_resource
+def get_supabase():
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        return None
+
+supabase = get_supabase()
 
 # --- TABELA DE PREÇOS (2026) ---
 PRECOS_BASE = {
@@ -35,24 +39,23 @@ TEMAS = {
 # --- FUNÇÕES DE FORMATAÇÃO ---
 def formata_dinheiro(valor):
     try:
-        if isinstance(valor, str):
-            valor = float(valor.replace("R$", "").replace(".", "").replace(",", ".").strip())
-        return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        f_val = float(valor)
+        return f"R$ {f_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except:
-        return valor
+        return "R$ 0,00"
 
-def formata_data_br(data_iso):
+def formata_data_br(data_string):
     try:
-        # Tenta converter de ISO (YYYY-MM-DD) para BR (DD/MM/YYYY)
-        dt = datetime.fromisoformat(data_iso.split('T')[0])
-        return dt.strftime("%d/%m/%Y")
+        # Tenta formatar string vinda do Supabase (ISO) para BR
+        dt = datetime.fromisoformat(data_string.replace('Z', '+00:00'))
+        return dt.strftime("%d/%m/%Y %H:%M")
     except:
-        return data_iso
+        return data_string
 
 # --- FUNÇÕES DE API ---
 def buscar_resultado_api(loteria_slug):
     try:
-        response = requests.get(f"https://loteriascaixa-api.herokuapp.com/api/{loteria_slug}/latest", timeout=10)
+        response = requests.get(f"https://loteriascaixa-api.herokuapp.com/api/{loteria_slug}/latest", timeout=5)
         return response.json() if response.status_code == 200 else None
     except: return None
 
@@ -81,66 +84,63 @@ st.markdown(f"""
 
 # --- TELAS ---
 def home():
-    st.markdown('<h2 style="text-align:center; margin-bottom:20px;">🍀 Portal Loterias Pro</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center;">🍀 Portal Loterias Pro</h2>', unsafe_allow_html=True)
     
     # 🔔 NOTIFICAÇÕES FORMATADAS
     st.write("🔔 **Destaques Acumulados:**")
     res_mega = buscar_resultado_api("megasena")
     res_loto = buscar_resultado_api("lotofacil")
-    res_quina = buscar_resultado_api("quina")
     
-    col_n1, col_n2, col_n3 = st.columns(3)
-    for col, res, nome in zip([col_n1, col_n2, col_n3], [res_mega, res_loto, res_quina], ["Mega", "Loto", "Quina"]):
+    col_n1, col_n2 = st.columns(2)
+    for col, res, nome in zip([col_n1, col_n2], [res_mega, res_loto], ["Mega-Sena", "Lotofácil"]):
         if res and res.get('acumulou'):
             valor = formata_dinheiro(res['valorEstimadoProximoConcurso'])
             col.markdown(f'<div class="notificacao"><b>{nome}</b><br><span style="color:#00ff00;">{valor}</span></div>', unsafe_allow_html=True)
 
     st.write("---")
     
-    # MENU INICIAL EM COLUNAS
+    # MENU INICIAL
     col1, col2 = st.columns(2)
     for i, (nome, dados) in enumerate(TEMAS.items()):
         alvo = col1 if i % 2 == 0 else col2
-        card_html = f"""
-        <a href="/?escolha={nome}" target="_self" class="card-container" style="--cor-loteria: {dados['cor']};">
-            <div style="font-size:24px;">🍀</div>
-            <div class="card-title">{nome}</div>
-        </a>
-        <div style="margin-bottom:10px;"></div>
-        """
+        card_html = f"""<a href="/?escolha={nome}" target="_self" class="card-container" style="--cor-loteria: {dados['cor']};">
+            <div style="font-size:24px;">🍀</div><div class="card-title">{nome}</div></a><div style="margin-bottom:10px;"></div>"""
         alvo.markdown(card_html, unsafe_allow_html=True)
     
     st.write("---")
-    st.subheader("📂 Busca Histórica de Jogos")
+    st.subheader("📂 Busca Histórica")
     
     c_b1, c_b2 = st.columns([2, 1])
-    data_filtro = c_b1.date_input("Data do jogo", value=None)
-    lot_filtro = c_b2.selectbox("Loteria", ["Todas"] + list(TEMAS.keys()))
+    data_sel = c_b1.date_input("Filtrar por data", value=None)
+    lot_sel = c_b2.selectbox("Loteria", ["Todas"] + list(TEMAS.keys()))
 
     if supabase:
         try:
             query = supabase.table("meus_jogos").select("*").order("created_at", desc=True)
-            if lot_filtro != "Todas": query = query.eq("loteria", lot_filtro)
-            res_db = query.execute().data
+            if lot_sel != "Todas": query = query.eq("loteria", lot_sel)
+            dados_db = query.execute().data
             
-            if data_filtro:
-                res_db = [j for j in res_db if j['created_at'].startswith(str(data_filtro))]
+            if data_sel:
+                data_str = data_sel.strftime("%Y-%m-%d")
+                dados_db = [j for j in dados_db if j['created_at'].startswith(data_str)]
             
-            for item in res_db[:8]:
-                data_br = formata_data_br(item['created_at'])
-                with st.expander(f"📅 {data_br} - {item['loteria']}"):
-                    st.caption(f"Ref: {item['concurso']}")
-                    st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
-        except: st.info("Histórico indisponível no momento.")
+            if not dados_db:
+                st.info("Nenhum jogo encontrado para este filtro.")
+            else:
+                for item in dados_db[:10]:
+                    dt_br = formata_data_br(item['created_at'])
+                    with st.expander(f"📅 {dt_br} - {item['loteria']}"):
+                        st.write(f"Concurso: {item['concurso']}")
+                        st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
+        except: st.error("Erro ao conectar com a nuvem.")
 
 def gerador_loteria(nome, config):
     c_v, c_t = st.columns([1, 4])
     with c_v:
-        if st.button("⬅️ Sair"):
-            st.query_params.clear(); st.session_state.pagina = "Início"; st.rerun()
+        if st.button("⬅️ Sair"): st.query_params.clear(); st.rerun()
     with c_t: st.markdown(f'<h3 style="color:{config["cor"]}; margin:0;">🍀 {nome}</h3>', unsafe_allow_html=True)
 
-    aba_gerar, aba_fechamento, aba_estatisticas, aba_conferir = st.tabs(["🚀 Gerador", "🛡️ Fechamentos", "📊 Estatísticas", "🎯 Conferidor"])
+    aba_gerar, aba_conf = st.tabs(["🚀 Gerador", "🎯 Conferidor"])
 
     with aba_gerar:
         c1, c2 = st.columns(2)
@@ -150,36 +150,31 @@ def gerador_loteria(nome, config):
         with c2:
             if st.button("📈 Mais Frequentes", use_container_width=True):
                 dfreq = buscar_resultado_api(config['api'])
-                if dfreq: st.session_state[f"sel_{nome}"] = [f"{n:02d}" for n in dfreq['dezenas']]
+                # CORREÇÃO DO ERRO DA IMAGEM 2: Verificar se dezenas existem
+                if dfreq and 'dezenas' in dfreq:
+                    st.session_state[f"sel_{nome}"] = [f"{int(n):02d}" for n in dfreq['dezenas'][:config['min_sel']]]
+                else:
+                    st.warning("Não foi possível obter dados frequentes agora.")
 
-        selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
+        sel = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
-        # CÁLCULO DE PREÇO AUTOMÁTICO
-        n_sel = len(selecionados) if selecionados else config['min_sel']
-        preco_val = PRECOS_BASE.get(nome, {}).get(n_sel, "Consulte")
+        n_at = len(sel) if sel else config['min_sel']
+        preco = PRECOS_BASE.get(nome, {}).get(n_at, "Sob consulta")
         
-        col_a, col_b, col_c = st.columns(3)
-        with col_a: dez_jogo = st.number_input("Dezenas", config['min_sel'], config['total'], config['min_sel'])
-        with col_b: st.metric("Custo Aposta", formata_dinheiro(preco_val) if isinstance(preco_val, float) else preco_val)
-        with col_c: 
-            tudo = st.checkbox("Gerar Todos")
-            q_max = st.number_input("Limite", 1, 1000000, 100, disabled=tudo)
+        st.metric("Custo Estimado", formata_dinheiro(preco) if isinstance(preco, float) else preco)
 
-        if st.button(f"🚀 GERAR JOGOS", type="primary", use_container_width=True):
-            if len(selecionados) < dez_jogo: st.error(f"Selecione no mínimo {dez_jogo} números!")
+        if st.button("🚀 GERAR JOGOS", type="primary", use_container_width=True):
+            if len(sel) < config['min_sel']: st.error("Selecione mais números!")
             else:
-                lista_n = sorted([int(x) for x in selecionados])
-                res = list(combinations(lista_n, dez_jogo)) if tudo else list(combinations(lista_n, dez_jogo))[:q_max]
-                st.session_state[f"ult_jogos_{nome}"] = res 
-                st.success(f"{len(res)} jogos gerados!")
-                st.dataframe(pd.DataFrame(res), use_container_width=True)
-                    
-        if f"ult_jogos_{nome}" in st.session_state and supabase:
-            if st.button("💾 Salvar na Nuvem"):
-                supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Manual", "dezenas": st.session_state[f"ult_jogos_{nome}"]}).execute()
-                st.toast("✅ Salvo com sucesso!")
-
-    # (Abas de Fechamento, Estatística e Conferidor mantêm a lógica anterior)
+                lista_n = sorted([int(x) for x in sel])
+                jogos = list(combinations(lista_n, config['min_sel']))[:100]
+                st.session_state[f"ult_{nome}"] = jogos
+                st.dataframe(pd.DataFrame(jogos), use_container_width=True)
+                
+                if supabase:
+                    if st.button("💾 Confirmar e Salvar"):
+                        supabase.table("meus_jogos").insert({"loteria": nome, "concurso": "Manual", "dezenas": jogos}).execute()
+                        st.toast("✅ Salvo!")
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início": home()

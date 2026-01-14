@@ -216,6 +216,8 @@ def gerador_loteria(nome, config):
 
         nome_bolao = st.text_input("Identificador (Apostador/Bolão):", "Manual", key=f"id_{nome}")
 
+        # --- SUBSTITUA APENAS O BLOCO DE SALVAMENTO NO SEU CÓDIGO ---
+
         if st.button("🚀 GERAR E SALVAR", type="primary", use_container_width=True):
             if not selecionados or len(selecionados) < dez_jogo: 
                 st.error(f"Selecione pelo menos {dez_jogo} números.")
@@ -223,16 +225,21 @@ def gerador_loteria(nome, config):
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
                 if res:
                     st.dataframe(pd.DataFrame(res), use_container_width=True)
-                    # --- CORREÇÃO DO ERRO DE SALVAMENTO ---
                     if supabase:
                         try:
-                            # Garante que a tabela referenciada seja 'meus_jogos'
-                            supabase.table("meus_jogos").insert({"loteria": nome, "dezenas": res, "participantes": nome_bolao}).execute()
+                            # Inserção com captura de erro bruto para diagnóstico
+                            data_insert = {
+                                "loteria": nome, 
+                                "dezenas": res, 
+                                "participantes": nome_bolao
+                            }
+                            response = supabase.table("meus_jogos").insert(data_insert).execute()
                             st.toast("✅ Jogos salvos!")
                         except Exception as e:
-                            st.error(f"Erro ao salvar no banco de dados: Verifique se a tabela 'meus_jogos' existe e as permissões de acesso.")
+                            # Isso mostrará o erro real do Supabase (ex: 'column loteria does not exist')
+                            st.error(f"Erro técnico no banco: {str(e)}")
+                            st.info("Dica: Verifique no Supabase se a tabela 'meus_jogos' tem as colunas: loteria, dezenas e participantes.")
                 else: st.warning("Nenhum jogo atendeu aos filtros.")
-
     with aba_conferir:
         if res_oficial:
             st.info(f"Concurso **{res_oficial['concurso']}** - {res_oficial['data']}")

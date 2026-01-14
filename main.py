@@ -1,17 +1,17 @@
 import streamlit as st
 import random
-import pandas as pd
+import pd as pd
 import requests
 import numpy as np
 from supabase import create_client, Client
 from itertools import combinations
 from datetime import datetime, timedelta
 
-# Importação protegida do Plotly
+# --- CORREÇÃO DO ERRO ModuleNotFoundError (Plotly) ---
 try:
     import plotly.express as px
     PLOTLY_AVAILABLE = True
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     PLOTLY_AVAILABLE = False
 
 # --- INICIALIZAÇÃO DE SEGURANÇA ---
@@ -19,7 +19,6 @@ def inicializar_estado():
     if "pagina" not in st.session_state:
         st.session_state.pagina = "Início"
     
-    # Sincroniza a página com a URL caso o usuário use o botão voltar do navegador
     q_params = st.query_params
     if "escolha" in q_params:
         st.session_state.pagina = q_params["escolha"]
@@ -122,7 +121,6 @@ st.markdown("""
 def home():
     st.markdown('<div class="main-title">🍀 Gerador Profissional & Analytics</div>', unsafe_allow_html=True)
     
-    # Alertas de Acumulados
     loterias_check = ["megasena", "quina", "duplasena", "lotofacil"]
     cols_n = st.columns(len(loterias_check), gap="small")
     for idx, slug in enumerate(loterias_check):
@@ -163,8 +161,8 @@ def home():
     with tab_stats:
         if PLOTLY_AVAILABLE and supabase:
             try:
-                # Reutiliza dados_db se existir
-                all_nums = [n for j in dados_db for sublist in j['dezenas'] for n in sublist]
+                dados_db_stats = supabase.table("meus_jogos").select("*").execute().data
+                all_nums = [n for j in dados_db_stats for sublist in j['dezenas'] for n in sublist]
                 if all_nums:
                     df_counts = pd.DataFrame(all_nums, columns=['Dezena']).value_counts().reset_index(name='Frequência')
                     st.plotly_chart(px.bar(df_counts.head(10), x='Dezena', y='Frequência', title="Dezenas mais usadas por você"), use_container_width=True)
@@ -173,7 +171,6 @@ def home():
 def gerador_loteria(nome, config):
     st.markdown(f'<div class="main-title" style="color:{config["cor"]};">🍀 {nome}</div>', unsafe_allow_html=True)
     
-    # Botão Voltar Corrigido
     if st.button("⬅️ Voltar ao Início"):
         st.query_params.clear()
         st.session_state.pagina = "Início"
@@ -194,7 +191,6 @@ def gerador_loteria(nome, config):
             if st.button("🗑️ Limpar", use_container_width=True):
                 st.session_state[f"sel_{nome}"] = []; st.rerun()
 
-        # --- CONTADOR DE DEZENAS ---
         selecionados = st.session_state[f"sel_{nome}"]
         qtd_sel = len(selecionados)
         cor_cont = "#00ff00" if qtd_sel >= config['min_sel'] else "#58a6ff"
@@ -227,9 +223,13 @@ def gerador_loteria(nome, config):
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
                 if res:
                     st.dataframe(pd.DataFrame(res), use_container_width=True)
+                    # --- CORREÇÃO DO ERRO APIError (Supabase) ---
                     if supabase:
-                        supabase.table("meus_jogos").insert({"loteria": nome, "dezenas": res, "participantes": nome_bolao}).execute()
-                        st.toast("✅ Jogos salvos!")
+                        try:
+                            supabase.table("meus_jogos").insert({"loteria": nome, "dezenas": res, "participantes": nome_bolao}).execute()
+                            st.toast("✅ Jogos salvos!")
+                        except Exception as e:
+                            st.error(f"Erro ao salvar no banco de dados. O jogo foi gerado, mas não pôde ser arquivado.")
                 else: st.warning("Nenhum jogo atendeu aos filtros.")
 
     with aba_conferir:
@@ -237,18 +237,20 @@ def gerador_loteria(nome, config):
             st.info(f"Concurso **{res_oficial['concurso']}** - {res_oficial['data']}")
             st.markdown("".join([f'<div class="resultado-bola" style="background-color:{config["cor"]}">{n:02d}</div>' for n in [int(n) for n in res_oficial['dezenas']]]), unsafe_allow_html=True)
             if supabase:
-                dt_sorteio = datetime.strptime(res_oficial['data'], "%d/%m/%Y").date()
-                dt_sorteio_previo = dt_sorteio - timedelta(days=5)
-                jogos_db = supabase.table("meus_jogos").select("*").eq("loteria", nome).execute().data
-                jogos_v = [j for j in jogos_db if dt_sorteio_previo.strftime("%Y-%m-%d") < j['created_at'][:10] <= dt_sorteio.strftime("%Y-%m-%d")]
-                if jogos_v:
-                    oficiais = [int(n) for n in res_oficial['dezenas']]
-                    for bloco in jogos_v:
-                        with st.expander(f"Aposta: {bloco.get('participantes')} - {formata_data_br(bloco['created_at'])}"):
-                            res_lista = [{"Jogo": j, "Acertos": len(set(j) & set(oficiais))} for j in bloco['dezenas']]
-                            df_res = pd.DataFrame(res_lista).sort_values("Acertos", ascending=False)
-                            st.dataframe(df_res, use_container_width=True)
-                            if df_res['Acertos'].max() >= (config['min_sel'] - 2): st.balloons(); st.success("🏆 PREMIADO!")
+                try:
+                    dt_sorteio = datetime.strptime(res_oficial['data'], "%d/%m/%Y").date()
+                    dt_sorteio_previo = dt_sorteio - timedelta(days=5)
+                    jogos_db = supabase.table("meus_jogos").select("*").eq("loteria", nome).execute().data
+                    jogos_v = [j for j in jogos_db if dt_sorteio_previo.strftime("%Y-%m-%d") < j['created_at'][:10] <= dt_sorteio.strftime("%Y-%m-%d")]
+                    if jogos_v:
+                        oficiais = [int(n) for n in res_oficial['dezenas']]
+                        for bloco in jogos_v:
+                            with st.expander(f"Aposta: {bloco.get('participantes')} - {formata_data_br(bloco['created_at'])}"):
+                                res_lista = [{"Jogo": j, "Acertos": len(set(j) & set(oficiais))} for j in bloco['dezenas']]
+                                df_res = pd.DataFrame(res_lista).sort_values("Acertos", ascending=False)
+                                st.dataframe(df_res, use_container_width=True)
+                                if df_res['Acertos'].max() >= (config['min_sel'] - 2): st.balloons(); st.success("🏆 PREMIADO!")
+                except: st.info("Não foi possível conferir os jogos com o banco de dados.")
 
     with aba_bolao:
         st.subheader("👥 Divisão de Cotas")

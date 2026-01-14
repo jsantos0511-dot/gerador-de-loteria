@@ -7,7 +7,7 @@ from supabase import create_client, Client
 from itertools import combinations
 from datetime import datetime, timedelta
 
-# Importação protegida para evitar que o app pare se o Plotly falhar
+# Importação protegida do Plotly
 try:
     import plotly.express as px
     PLOTLY_AVAILABLE = True
@@ -18,7 +18,14 @@ except ImportError:
 def inicializar_estado():
     if "pagina" not in st.session_state:
         st.session_state.pagina = "Início"
-    # Garante que as chaves de seleção existam para cada loteria
+    
+    # Sincroniza a página com a URL caso o usuário use o botão voltar do navegador
+    q_params = st.query_params
+    if "escolha" in q_params:
+        st.session_state.pagina = q_params["escolha"]
+    else:
+        st.session_state.pagina = "Início"
+
     loterias = ["Mega-Sena", "Lotofácil", "Quina", "Lotomania", "Dupla Sena"]
     for loteria in loterias:
         if f"sel_{loteria}" not in st.session_state:
@@ -103,29 +110,27 @@ st.markdown("""
         background-color: #209869; color: white; border-radius: 50%;
         text-align: center; margin: 2px; font-weight: bold; font-size: 0.8rem;
     }
+    .contador-badge {
+        background: #30363d; padding: 5px 12px; border-radius: 20px; 
+        font-weight: bold; border: 1px solid #58a6ff; color: #58a6ff;
+    }
     </style>
     """, unsafe_allow_html=True)
-
-# --- NAVEGAÇÃO ---
-query_params = st.query_params
-if "escolha" in query_params:
-    st.session_state.pagina = query_params["escolha"]
 
 # --- TELAS ---
 
 def home():
     st.markdown('<div class="main-title">🍀 Gerador Profissional & Analytics</div>', unsafe_allow_html=True)
     
-    # 4. ALERTAS (Acumulados > 50 Mi)
+    # Alertas de Acumulados
     loterias_check = ["megasena", "quina", "duplasena", "lotofacil"]
     cols_n = st.columns(len(loterias_check), gap="small")
     for idx, slug in enumerate(loterias_check):
         res = buscar_resultado_api(slug)
         if res:
             estimativa = res.get('valorEstimadoProximoConcurso', 0)
-            valor = formata_dinheiro(estimativa)
             cor_borda = "border: 2px solid #00ff00;" if estimativa > 50000000 else "border-left: 4px solid #ffcc00;"
-            cols_n[idx].markdown(f'<div class="notificacao" style="{cor_borda}"><b>{slug.upper()}</b><br><span style="color:#00ff00;">{valor}</span></div>', unsafe_allow_html=True)
+            cols_n[idx].markdown(f'<div class="notificacao" style="{cor_borda}"><b>{slug.upper()}</b><br><span style="color:#00ff00;">{formata_dinheiro(estimativa)}</span></div>', unsafe_allow_html=True)
 
     st.write("---")
     col1, col2 = st.columns(2, gap="small")
@@ -142,7 +147,6 @@ def home():
         c1, c2 = st.columns(2)
         d_ini = c1.date_input("Início:", value=None, key="hist_ini")
         d_fim = c2.date_input("Fim:", value=None, key="hist_fim")
-
         if supabase:
             try:
                 dados_db = supabase.table("meus_jogos").select("*").order("created_at", desc=True).execute().data
@@ -151,30 +155,29 @@ def home():
                 else:
                     corte = (datetime.now() - timedelta(days=15)).strftime("%Y-%m-%d")
                     dados_db = [j for j in dados_db if j['created_at'][:10] >= corte]
-
-                if dados_db:
-                    for item in dados_db:
-                        with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
-                            st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
-                else:
-                    st.info("Nenhum jogo encontrado no período.")
+                for item in dados_db:
+                    with st.expander(f"📅 {formata_data_br(item['created_at'])} - {item['loteria']}"):
+                        st.dataframe(pd.DataFrame(item['dezenas']), use_container_width=True)
             except: st.info("Conectando ao histórico...")
 
     with tab_stats:
-        if PLOTLY_AVAILABLE:
-            if supabase and 'dados_db' in locals() and dados_db:
+        if PLOTLY_AVAILABLE and supabase:
+            try:
+                # Reutiliza dados_db se existir
                 all_nums = [n for j in dados_db for sublist in j['dezenas'] for n in sublist]
                 if all_nums:
                     df_counts = pd.DataFrame(all_nums, columns=['Dezena']).value_counts().reset_index(name='Frequência')
-                    st.plotly_chart(px.bar(df_counts.head(10), x='Dezena', y='Frequência', title="Dezenas que você mais utiliza"), use_container_width=True)
-                else:
-                    st.info("Ainda não há dezenas suficientes no histórico para análise.")
-        else:
-            st.warning("Estatísticas temporariamente indisponíveis (Instale o 'plotly' no requirements.txt)")
+                    st.plotly_chart(px.bar(df_counts.head(10), x='Dezena', y='Frequência', title="Dezenas mais usadas por você"), use_container_width=True)
+            except: st.info("Sem dados estatísticos.")
 
 def gerador_loteria(nome, config):
     st.markdown(f'<div class="main-title" style="color:{config["cor"]};">🍀 {nome}</div>', unsafe_allow_html=True)
-    if st.button("⬅️ Voltar"): st.query_params.clear(); st.rerun()
+    
+    # Botão Voltar Corrigido
+    if st.button("⬅️ Voltar ao Início"):
+        st.query_params.clear()
+        st.session_state.pagina = "Início"
+        st.rerun()
 
     aba_gerar, aba_fechamento, aba_conferir, aba_bolao = st.tabs(["🚀 Gerador", "🛡️ Fechamentos", "✅ Conferir", "👥 Bolão"])
 
@@ -191,6 +194,12 @@ def gerador_loteria(nome, config):
             if st.button("🗑️ Limpar", use_container_width=True):
                 st.session_state[f"sel_{nome}"] = []; st.rerun()
 
+        # --- CONTADOR DE DEZENAS ---
+        selecionados = st.session_state[f"sel_{nome}"]
+        qtd_sel = len(selecionados)
+        cor_cont = "#00ff00" if qtd_sel >= config['min_sel'] else "#58a6ff"
+        st.markdown(f'**Selecionados:** <span class="contador-badge" style="color:{cor_cont}; border-color:{cor_cont};">{qtd_sel}</span> dezenas', unsafe_allow_html=True)
+
         selecionados = st.segmented_control("V", options=[f"{i:02d}" for i in range(1, config['total'] + 1)], selection_mode="multi", key=f"sel_{nome}", label_visibility="collapsed")
         
         col_p1, col_p2, col_p3 = st.columns(3)
@@ -199,7 +208,6 @@ def gerador_loteria(nome, config):
             tudo = st.checkbox("Gerar Tudo", key=f"tudo_{nome}")
             q_max = st.number_input("Limite Máx.", 1, 1000, 100, disabled=tudo, key=f"lim_{nome}")
         with col_p3:
-            # Preço dinâmico baseado na quantidade selecionada ou padrão
             qtd_para_preco = len(selecionados) if (selecionados and len(selecionados) >= config['min_sel']) else config['min_sel']
             preco = PRECOS_BASE.get(nome, {}).get(qtd_para_preco, "Consulte")
             st.metric("Custo Estimado", formata_dinheiro(preco))
@@ -214,28 +222,25 @@ def gerador_loteria(nome, config):
 
         if st.button("🚀 GERAR E SALVAR", type="primary", use_container_width=True):
             if not selecionados or len(selecionados) < dez_jogo: 
-                st.error(f"Selecione pelo menos {dez_jogo} números para gerar os jogos.")
+                st.error(f"Selecione pelo menos {dez_jogo} números.")
             else:
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
                 if res:
                     st.dataframe(pd.DataFrame(res), use_container_width=True)
                     if supabase:
                         supabase.table("meus_jogos").insert({"loteria": nome, "dezenas": res, "participantes": nome_bolao}).execute()
-                        st.toast("✅ Jogos salvos com sucesso!")
-                else:
-                    st.warning("Nenhum jogo atendeu aos filtros selecionados.")
+                        st.toast("✅ Jogos salvos!")
+                else: st.warning("Nenhum jogo atendeu aos filtros.")
 
     with aba_conferir:
         if res_oficial:
-            dt_sorteio = datetime.strptime(res_oficial['data'], "%d/%m/%Y").date()
-            dt_sorteio_previo = dt_sorteio - timedelta(days=5)
-            st.info(f"Concurso **{res_oficial['concurso']}** - Realizado em {res_oficial['data']}")
+            st.info(f"Concurso **{res_oficial['concurso']}** - {res_oficial['data']}")
             st.markdown("".join([f'<div class="resultado-bola" style="background-color:{config["cor"]}">{n:02d}</div>' for n in [int(n) for n in res_oficial['dezenas']]]), unsafe_allow_html=True)
-            
             if supabase:
+                dt_sorteio = datetime.strptime(res_oficial['data'], "%d/%m/%Y").date()
+                dt_sorteio_previo = dt_sorteio - timedelta(days=5)
                 jogos_db = supabase.table("meus_jogos").select("*").eq("loteria", nome).execute().data
                 jogos_v = [j for j in jogos_db if dt_sorteio_previo.strftime("%Y-%m-%d") < j['created_at'][:10] <= dt_sorteio.strftime("%Y-%m-%d")]
-                
                 if jogos_v:
                     oficiais = [int(n) for n in res_oficial['dezenas']]
                     for bloco in jogos_v:
@@ -243,20 +248,14 @@ def gerador_loteria(nome, config):
                             res_lista = [{"Jogo": j, "Acertos": len(set(j) & set(oficiais))} for j in bloco['dezenas']]
                             df_res = pd.DataFrame(res_lista).sort_values("Acertos", ascending=False)
                             st.dataframe(df_res, use_container_width=True)
-                            if df_res['Acertos'].max() >= (config['min_sel'] - 2): 
-                                st.balloons()
-                                st.success("🏆 TEMOS PREMIAÇÃO!")
-                else:
-                    st.warning("Nenhum jogo seu foi encontrado para este concurso.")
+                            if df_res['Acertos'].max() >= (config['min_sel'] - 2): st.balloons(); st.success("🏆 PREMIADO!")
 
     with aba_bolao:
         st.subheader("👥 Divisão de Cotas")
         n_pessoas = st.number_input("Total de Participantes:", 1, 100, 1, key=f"np_{nome}")
-        # Calcula o preço com base no jogo gerado
         valor_base = float(PRECOS_BASE.get(nome, {}).get(dez_jogo, 0))
         if n_pessoas > 0:
             st.info(f"Valor por pessoa: **{formata_dinheiro(valor_base / n_pessoas)}**")
-        st.write("Dica: Use o Identificador na aba 'Gerador' para separar suas apostas de grupos diferentes.")
 
 # --- EXECUÇÃO ---
 if st.session_state.pagina == "Início": 

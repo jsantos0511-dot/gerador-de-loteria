@@ -1,13 +1,16 @@
 import streamlit as st
 import random
-import pd as pd
+# CORREÇÃO: O nome correto do módulo é 'pandas', não 'pd'.
+import pandas as pd 
 import requests
 import numpy as np
 from supabase import create_client, Client
 from itertools import combinations
 from datetime import datetime, timedelta
 
-# --- CORREÇÃO DO ERRO ModuleNotFoundError (Plotly) ---
+# --- CORREÇÃO DE ModuleNotFoundError ---
+# O erro na imagem indica que 'plotly' ou 'pandas' (como 'pd') não foram encontrados.
+# Além de corrigir a importação acima, garantimos que o bloco abaixo trate a ausência do Plotly.
 try:
     import plotly.express as px
     PLOTLY_AVAILABLE = True
@@ -161,8 +164,8 @@ def home():
     with tab_stats:
         if PLOTLY_AVAILABLE and supabase:
             try:
-                dados_db_stats = supabase.table("meus_jogos").select("*").execute().data
-                all_nums = [n for j in dados_db_stats for sublist in j['dezenas'] for n in sublist]
+                # Reutiliza dados_db se existir
+                all_nums = [n for j in dados_db if 'dezenas' in j for sublist in j['dezenas'] for n in sublist]
                 if all_nums:
                     df_counts = pd.DataFrame(all_nums, columns=['Dezena']).value_counts().reset_index(name='Frequência')
                     st.plotly_chart(px.bar(df_counts.head(10), x='Dezena', y='Frequência', title="Dezenas mais usadas por você"), use_container_width=True)
@@ -223,13 +226,13 @@ def gerador_loteria(nome, config):
                 res = aplicar_filtros(combinations(sorted([int(x) for x in selecionados]), dez_jogo), f_s, f_f, f_p, m_p, dez_jogo, q_max, tudo)
                 if res:
                     st.dataframe(pd.DataFrame(res), use_container_width=True)
-                    # --- CORREÇÃO DO ERRO APIError (Supabase) ---
+                    # CORREÇÃO DO APIError: Adição de try/except para capturar falhas na inserção do banco
                     if supabase:
                         try:
                             supabase.table("meus_jogos").insert({"loteria": nome, "dezenas": res, "participantes": nome_bolao}).execute()
                             st.toast("✅ Jogos salvos!")
                         except Exception as e:
-                            st.error(f"Erro ao salvar no banco de dados. O jogo foi gerado, mas não pôde ser arquivado.")
+                            st.error(f"Erro ao salvar no banco de dados: Verifique se a tabela 'meus_jogos' existe e as permissões de acesso.")
                 else: st.warning("Nenhum jogo atendeu aos filtros.")
 
     with aba_conferir:
@@ -250,7 +253,7 @@ def gerador_loteria(nome, config):
                                 df_res = pd.DataFrame(res_lista).sort_values("Acertos", ascending=False)
                                 st.dataframe(df_res, use_container_width=True)
                                 if df_res['Acertos'].max() >= (config['min_sel'] - 2): st.balloons(); st.success("🏆 PREMIADO!")
-                except: st.info("Não foi possível conferir os jogos com o banco de dados.")
+                except: st.info("Houve um problema ao consultar o histórico para conferência.")
 
     with aba_bolao:
         st.subheader("👥 Divisão de Cotas")

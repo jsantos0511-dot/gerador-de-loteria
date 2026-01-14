@@ -66,8 +66,14 @@ def formata_dinheiro(valor):
     except: return "R$ 0,00"
 
 def formata_data_br(data_string):
-    try: return datetime.fromisoformat(data_string.split('.')[0].replace('Z', '')).strftime("%d/%m/%Y %H:%M")
-    except: return data_string
+    try:
+        # Lê a data original do banco (UTC)
+        dt = datetime.fromisoformat(data_string.split('.')[0].replace('Z', ''))
+        # Subtrai 3 horas para ajustar ao fuso horário de Brasília
+        dt_brasil = dt - timedelta(hours=3)
+        return dt_brasil.strftime("%d/%m/%Y %H:%M")
+    except:
+        return data_string
 
 @st.cache_data(ttl=3600)
 def buscar_resultado_api(loteria_slug):
